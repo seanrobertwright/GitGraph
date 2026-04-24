@@ -1,0 +1,15 @@
+node_modules/
+.next/
+out/
+dist/
+build/
+coverage/
+.turbo/
+test-results/
+playwright-report/
+playwright/.cache/
+.DS_Store
+*.log
+.env*.local
+*.tsbuildinfo
+.claude/

@@ -1,13 +1,24 @@
 import type { Commit, EdgeKind, LayoutEdge, LayoutResult, LayoutRow } from "../types";
 
-// Duplicate shas: last occurrence wins in the sha→commit map. Topological
-// ordering treats duplicates as the same node, so output may be surprising —
-// callers should dedupe their input.
+// Throws on duplicate shas or cycles in the commit graph. Unknown parents
+// (referenced in `parents[]` but not present in `commits`) are silently
+// ignored — the windowed-log case, where a consumer passes only the last N
+// commits of a long history. This applies uniformly to primary and secondary
+// parents: a merge-edge to an in-window parent is still emitted even when
+// the primary parent is out-of-window.
 export function computeLayout(commits: Commit[]): LayoutResult {
   const bySha = new Map<string, Commit>();
-  for (const c of commits) bySha.set(c.sha, c);
+  for (const c of commits) {
+    if (bySha.has(c.sha)) {
+      throw new Error(`computeLayout: duplicate sha in input: ${c.sha}`);
+    }
+    bySha.set(c.sha, c);
+  }
 
   const sorted = topoSort(commits, bySha);
+  if (sorted.length !== commits.length) {
+    throw new Error("computeLayout: cycle detected in commit graph");
+  }
 
   const lanes: (string | null)[] = [];
   const rows: LayoutRow[] = [];
@@ -98,7 +109,12 @@ function claimFreeLane(lanes: (string | null)[]): number {
 }
 
 function toTimestampNumber(t: number | string): number {
-  return typeof t === "number" ? t : Date.parse(t);
+  if (typeof t === "number") return t;
+  const n = Date.parse(t);
+  if (Number.isNaN(n)) {
+    throw new Error(`computeLayout: unparseable timestamp string: ${t}`);
+  }
+  return n;
 }
 
 function topoSort(commits: Commit[], bySha: Map<string, Commit>): Commit[] {
@@ -111,24 +127,22 @@ function topoSort(commits: Commit[], bySha: Map<string, Commit>): Commit[] {
     }
   }
 
-  const ready: Commit[] = [];
-  for (const c of commits) {
-    if (remainingChildren.get(c.sha) === 0) ready.push(c);
-  }
-
-  const result: Commit[] = [];
-  const compare = (a: Commit, b: Commit): number => {
+  const heap = new MinHeap<Commit>((a, b) => {
     const ta = toTimestampNumber(a.timestamp);
     const tb = toTimestampNumber(b.timestamp);
-    if (ta !== tb) return tb - ta;
+    if (ta !== tb) return tb - ta; // desc: newer first
     if (a.sha < b.sha) return -1;
     if (a.sha > b.sha) return 1;
     return 0;
-  };
+  });
 
-  while (ready.length > 0) {
-    ready.sort(compare);
-    const next = ready.shift()!;
+  for (const c of commits) {
+    if (remainingChildren.get(c.sha) === 0) heap.push(c);
+  }
+
+  const result: Commit[] = [];
+  while (heap.size > 0) {
+    const next = heap.pop()!;
     result.push(next);
     for (const p of next.parents) {
       const current = remainingChildren.get(p);
@@ -137,10 +151,62 @@ function topoSort(commits: Commit[], bySha: Map<string, Commit>): Commit[] {
       remainingChildren.set(p, updated);
       if (updated === 0) {
         const parentCommit = bySha.get(p);
-        if (parentCommit) ready.push(parentCommit);
+        if (parentCommit) heap.push(parentCommit);
       }
     }
   }
 
   return result;
+}
+
+// Binary min-heap. Keeps topo-ready set ordered by comparator without
+// re-sorting the full list on every pop (O(log n) per push/pop instead of
+// O(n log n) per iteration).
+class MinHeap<T> {
+  private readonly data: T[] = [];
+  constructor(private readonly compare: (a: T, b: T) => number) {}
+
+  get size(): number {
+    return this.data.length;
+  }
+
+  push(value: T): void {
+    this.data.push(value);
+    this.siftUp(this.data.length - 1);
+  }
+
+  pop(): T | undefined {
+    const n = this.data.length;
+    if (n === 0) return undefined;
+    const top = this.data[0]!;
+    const last = this.data.pop()!;
+    if (n > 1) {
+      this.data[0] = last;
+      this.siftDown(0);
+    }
+    return top;
+  }
+
+  private siftUp(i: number): void {
+    while (i > 0) {
+      const parent = (i - 1) >> 1;
+      if (this.compare(this.data[i]!, this.data[parent]!) >= 0) return;
+      [this.data[i], this.data[parent]] = [this.data[parent]!, this.data[i]!];
+      i = parent;
+    }
+  }
+
+  private siftDown(i: number): void {
+    const n = this.data.length;
+    for (;;) {
+      const l = i * 2 + 1;
+      const r = l + 1;
+      let best = i;
+      if (l < n && this.compare(this.data[l]!, this.data[best]!) < 0) best = l;
+      if (r < n && this.compare(this.data[r]!, this.data[best]!) < 0) best = r;
+      if (best === i) return;
+      [this.data[i], this.data[best]] = [this.data[best]!, this.data[i]!];
+      i = best;
+    }
+  }
 }

@@ -43,9 +43,11 @@ describe("computeLayout — invariants", () => {
   });
 
   test("does not mutate its input", () => {
-    const snapshot = structuredClone(longLivedReleaseFixture);
-    computeLayout(longLivedReleaseFixture);
-    expect(longLivedReleaseFixture).toEqual(snapshot);
+    for (const [name, input] of cases) {
+      const snapshot = structuredClone(input);
+      computeLayout(input);
+      expect(input, `fixture ${name} was mutated`).toEqual(snapshot);
+    }
   });
 
   test("places every commit exactly once", () => {
@@ -63,5 +65,33 @@ describe("computeLayout — invariants", () => {
       const maxLane = Math.max(-1, ...result.rows.map((r) => r.lane));
       expect(result.laneCount, `fixture ${name}`).toBe(maxLane + 1);
     }
+  });
+});
+
+describe("computeLayout — malformed input", () => {
+  const author = { name: "A" };
+
+  test("throws on duplicate sha", () => {
+    const input: Commit[] = [
+      { sha: "x", parents: [], author, message: "first",  timestamp: 1 },
+      { sha: "x", parents: [], author, message: "second", timestamp: 2 },
+    ];
+    expect(() => computeLayout(input)).toThrow(/duplicate sha/);
+  });
+
+  test("throws on cycle", () => {
+    const input: Commit[] = [
+      { sha: "a", parents: ["b"], author, message: "a", timestamp: 1 },
+      { sha: "b", parents: ["a"], author, message: "b", timestamp: 2 },
+    ];
+    expect(() => computeLayout(input)).toThrow(/cycle/);
+  });
+
+  test("throws on unparseable timestamp string", () => {
+    const input: Commit[] = [
+      { sha: "a", parents: [], author, message: "a", timestamp: "not a date" },
+      { sha: "b", parents: [], author, message: "b", timestamp: 1 },
+    ];
+    expect(() => computeLayout(input)).toThrow(/unparseable timestamp/);
   });
 });

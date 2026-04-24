@@ -9,7 +9,7 @@
     "dev:consumer": "pnpm --filter consumer-app dev -p 3100",
     "build:docs": "pnpm --filter docs build",
     "lint": "pnpm -r --parallel lint",
-    "typecheck": "pnpm -r --parallel typecheck",
+    "typecheck": "pnpm -r --parallel typecheck && tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test"
   },

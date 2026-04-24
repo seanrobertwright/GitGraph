@@ -12,4 +12,5 @@ playwright/.cache/
 *.log
 .env*.local
 *.tsbuildinfo
-.claude/
+.claude/*
+!.claude/commands/

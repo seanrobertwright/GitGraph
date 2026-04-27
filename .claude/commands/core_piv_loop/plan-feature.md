@@ -114,6 +114,8 @@ Before emitting the plan: do a one-pass grep over your draft for each key identi
 
 Common failure mode: `generateStaticParams` returns `{ name: "foo" }` but the validation step expects `out/foo.json`. The reader reconciles by guessing; the execute agent typically guesses wrong. Catching this at plan time is a ~30-second grep; catching it at execution time is a full retry.
 
+**Hand-trace fixtures with embedded expected output.** If the plan colocates a hand-authored expected result with a fixture (the "plan as source of truth" pattern that breaks snapshot circularity for deterministic algorithms), walk the stated algorithm step-by-step against each fixture and confirm every field of the expected output is reachable from the algorithm + tiebreak rules. Contradictions between narrative walk-through and embedded expected values are the highest-value bug class to catch at plan time — they cost ~30s to find now and a full retry to fix during execution. This applies to: layout/graph fixtures, expected SQL query results, expected rendered output (SVG paths, HTML strings), expected serialized payloads — anywhere the plan author claims "for input X, output Y."
+
 ### Phase 2.7: External-System Assumption Audit
 
 Every plan makes claims about systems not under the repo's control. List every such claim explicitly, and for each, either:
@@ -346,6 +348,8 @@ Use information-dense keywords for clarity:
 4. Then create the feature branch and proceed with the rest of the plan.
 
 Skipping step 3 means `gh repo create --source .` or first-push-wins will make the feature branch the remote default, and opening a PR will require an orphan-commit rebase dance. Do not optimize this step away.
+
+**No "implementation-defined" error handling at security/integrity boundaries.** If invalid input could (a) cause a downstream non-null assertion or unchecked index access to crash with a confusing error, or (b) silently corrupt internal state (e.g. last-wins on a duplicate key that other code counts), the plan must specify *throw with a named, descriptive error* and include the error test in the same task as the validation. Wording like "may throw or use last-wins" or "implementation-defined" is not a valid spec — pick one, and pick "throw" by default at any boundary where a non-null assertion lives downstream. This rule supersedes any "deferred to a later errors.spec" instinct: the validation lives at the boundary it protects, not in a later phase.
 
 **Native-binding pins.** If the plan pins a top-level package from an ecosystem that ships native bindings as separate transitive packages (Tailwind v4's `@tailwindcss/oxide` + `@tailwindcss/node`, Rollup's `@rollup/rollup-<platform>-*`, esbuild's `@esbuild/*`, swc's `@swc/core-<platform>-*`, lightningcss's `lightningcss-<platform>-*`, etc.), the plan must also pin those natives via `pnpm.overrides` (or npm `overrides` / yarn `resolutions`). Do not treat top-level pins as sufficient — the natives float across minor versions and their binary struct shapes change, producing runtime errors that never surface at `install` time.
 

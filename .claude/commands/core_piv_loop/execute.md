@@ -81,6 +81,10 @@ Grouping multiple destructive actions into one confirmation is fine — show the
 
 Reversible local actions (editing files, running tests, running builds, restarting local dev servers) do not need confirmation.
 
+#### f. `git status` before `gh pr create`
+
+Before opening any PR, run `git status` and surface every untracked file or unstaged change to the user as an explicit decision point — not a passive warning the executor scrolls past. For each, decide together: include in this PR, commit separately on the branch first, or leave for a post-merge follow-up. `gh pr create`'s own "N untracked changes" warning is too easy to ignore and produces dirty PRs or surprise leftovers on the working tree post-merge.
+
 ### 3. Implement Testing Strategy
 
 After completing implementation tasks:
@@ -89,6 +93,8 @@ After completing implementation tasks:
 - Implement all test cases mentioned
 - Follow the testing approach outlined
 - Ensure tests cover edge cases
+
+**Hot-path validation tests:** when an error is raised inside a comparator, visitor, reducer, or callback that only fires under specific structural conditions (`heap.size ≥ 2`, `array.length > 1`, a node with ≥ 2 children, a recursion depth > 1), construct test inputs that force the path to fire. A single-element input will not exercise a comparator; a single-node tree will not exercise a recursive visitor. If the assertion can pass via "the validator was never called," the test is a false positive — the validation looks covered but the path is dead code under that fixture. Verify the path fires (a `console.log` during development is enough) before declaring the test complete.
 
 ### 4. Run Validation Commands
 

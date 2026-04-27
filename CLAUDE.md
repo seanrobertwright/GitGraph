@@ -14,6 +14,8 @@ React component for rendering Git commit history as a visual DAG, shadcn-install
 
 Exact versions in each app's `package.json`. Do not bump without verifying the transitive Tailwind native stack still matches (see below).
 
+`pnpm typecheck` runs two passes: per-workspace via `pnpm -r --parallel typecheck`, then a root `tsc -p tsconfig.json --noEmit` over `registry/**` and `tests/**`. New top-level source dirs outside `apps/` and `examples/` (e.g. a future `cli/`) must be added to root `tsconfig.json`'s `include`, not to per-app tsconfigs.
+
 ## Dependency pinning policy
 
 **Tailwind v4 native bindings:** `@tailwindcss/oxide` and `@tailwindcss/node` float transitively across Tailwind minor versions. Their Rust `ScannerOptions` struct shape changes between minors. Mismatch produces opaque errors at Next's CSS loader (`Missing field 'negated' on ScannerOptions.sources`, then `TypeError: Cannot convert undefined or null to object`) — never at install time.
@@ -69,3 +71,4 @@ Applies more broadly: any time we pin a top-level package from an ecosystem that
 - `/gsd:*` commands are **not used** on this project. Plan phases conversationally using `.agents/plans/`.
 - Execution reports land in `.agents/execution-reports/`, code reviews in `.agents/code-reviews/`, system reviews in `.agents/system-reviews/`.
 - Any action that pushes, opens a PR, merges, or changes shared state: confirm with user first. Local file edits and test runs are fine to do without checking.
+- **Artifact-commit cadence.** Files under `.agents/plans/`, `.agents/code-reviews/`, `.agents/system-reviews/`, and `.agents/execution-reports/` are committed in a single follow-up commit on `main` *after* the implementation PR squash-merges — never inside the implementation PR. They aren't feature artifacts and would dilute the PR diff. This also avoids the "N untracked changes" warning during `gh pr create`.

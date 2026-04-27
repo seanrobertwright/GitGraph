@@ -87,7 +87,35 @@ Verify every task that does any of the following is flagged in the plan as "user
 
 If a destructive action is listed without a user-gate, flag it.
 
-### 7. Dead-reference check
+### 7. Implementation-defined error handling at integrity boundaries
+
+Search the plan for language that defers a behavior choice to the implementer where downstream code would crash or silently corrupt state:
+
+- "may throw or [do X]"
+- "may [throw / use last-wins / ignore]"
+- "implementation-defined"
+- "either ... or ..." applied to error handling
+- "document whichever behavior you pick"
+
+For each match: if the input being described could (a) feed a non-null assertion (`!`), unchecked index access, or `Map.get(...)!` downstream, or (b) corrupt counts/relationships that other code depends on (duplicate keys in a map, cycles in a graph, NaN in arithmetic), flag it. The plan must specify *throw with a named error* and include the error test in the same task as the validation. "Pick one and document inline" is not a valid spec — pick at plan time.
+
+### 8. Hand-traced fixtures with embedded expected output
+
+If the plan includes fixtures that colocate input + hand-authored expected output (the "plan as source of truth" pattern that breaks snapshot circularity for deterministic algorithms), verify each expected value is reachable from the stated algorithm:
+
+- Identify any section listing a non-trivial fixture with both `input` and `expected` (LayoutResult, expected SQL rows, expected SVG path strings, expected serialized payloads).
+- For each such fixture, check whether the plan includes a step-by-step walk-through of the algorithm against the fixture's input.
+- If the plan provides a walk-through with named row/step labels, verify the embedded expected values agree with the walk-through. The Phase 2 long-lived-release contradiction (m3 vs r2 row swap) is the canonical failure: walk-through said one order, expected `rows[]` labeled the opposite. Grep for this class — narrative description of an order vs. concrete labels in the expected block.
+- If no walk-through exists for a non-trivial fixture, flag it: the plan author should either include the walk-through or downgrade the fixture's complexity. Without a walk-through, embedded expected values are unverifiable claims.
+
+### 9. Hot-path validation tests
+
+For any task whose `IMPLEMENT` adds a `throw` inside a comparator, visitor, reducer, recursive helper, or callback that only fires under specific structural conditions (`heap.size ≥ 2`, `array.length > 1`, recursion depth > 1, ≥ 2 children):
+
+- Verify the corresponding test in the plan uses input that *forces the path to fire*. A single-element input does not exercise a comparator; a single-node tree does not exercise a recursive visitor.
+- If the plan's test fixture for the throw path could pass via "the validator was never called," flag it. The Phase 2 NaN-timestamp-with-one-commit miss is the canonical failure.
+
+### 10. Dead-reference check
 
 - Every file listed in "New Files to Create" should appear in at least one STEP-BY-STEP task.
 - Every pattern/library/doc in "CONTEXT REFERENCES" should be cited by at least one task's `IMPLEMENT`, `PATTERN`, or `GOTCHA`.

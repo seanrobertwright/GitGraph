@@ -3,10 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
+    "predev": "node ../../scripts/sync-registry.mjs",
     "dev": "next dev",
+    "prebuild": "node ../../scripts/sync-registry.mjs",
     "build": "next build",
     "start": "next start",
+    "prelint": "node ../../scripts/sync-registry.mjs",
     "lint": "next lint",
+    "pretypecheck": "node ../../scripts/sync-registry.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

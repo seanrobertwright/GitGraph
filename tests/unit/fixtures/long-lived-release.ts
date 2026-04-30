@@ -37,7 +37,7 @@ export const longLivedReleaseExpected: LayoutResult = {
     { fromSha: "m3", toSha: "m2", fromLane: 0, toLane: 0, fromRow: 4, toRow: 6, kind: "straight" },
     { fromSha: "r2", toSha: "r1", fromLane: 1, toLane: 1, fromRow: 5, toRow: 7, kind: "straight" },
     { fromSha: "m2", toSha: "m1", fromLane: 0, toLane: 0, fromRow: 6, toRow: 8, kind: "straight" },
-    { fromSha: "r1", toSha: "m1", fromLane: 1, toLane: 0, fromRow: 7, toRow: 8, kind: "straight" },
+    { fromSha: "r1", toSha: "m1", fromLane: 1, toLane: 0, fromRow: 7, toRow: 8, kind: "fork"     },
   ],
   laneCount: 2,
 };

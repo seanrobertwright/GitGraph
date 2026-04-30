@@ -1,0 +1,40 @@
+/*
+ * GitGraph theming surface.
+ *
+ * Lane colors: --graph-branch-1..8. Lanes index by lane number mod 8, so lane 8
+ * reuses the color of lane 0, lane 9 reuses lane 1, etc. Override any of these
+ * in your own :root or .dark scope to retheme the graph.
+ *
+ * Geometry: --graph-node-radius, --graph-stroke-width set the visual weight
+ * of nodes and edges. --graph-lane-width and --graph-row-height set the grid
+ * spacing and must match the values you pass as props to <GitGraphGutter>.
+ */
+
+:root {
+  --graph-branch-1: hsl(220 80% 55%);
+  --graph-branch-2: hsl(350 75% 55%);
+  --graph-branch-3: hsl(145 60% 45%);
+  --graph-branch-4: hsl(35 90% 55%);
+  --graph-branch-5: hsl(280 65% 60%);
+  --graph-branch-6: hsl(190 75% 50%);
+  --graph-branch-7: hsl(60 80% 50%);
+  --graph-branch-8: hsl(320 65% 55%);
+
+  --graph-node-radius: 5px;
+  --graph-stroke-width: 1.5px;
+  --graph-lane-width: 16px;
+  --graph-row-height: 40px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --graph-branch-1: hsl(220 80% 65%);
+    --graph-branch-2: hsl(350 75% 65%);
+    --graph-branch-3: hsl(145 60% 55%);
+    --graph-branch-4: hsl(35 90% 65%);
+    --graph-branch-5: hsl(280 65% 70%);
+    --graph-branch-6: hsl(190 75% 60%);
+    --graph-branch-7: hsl(60 80% 60%);
+    --graph-branch-8: hsl(320 65% 65%);
+  }
+}

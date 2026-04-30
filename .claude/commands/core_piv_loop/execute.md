@@ -119,6 +119,18 @@ Before completing:
 - ✅ Code follows project conventions
 - ✅ Documentation added/updated as needed
 
+### 6. Post-execution plan corrections
+
+If, during execution, a plan-prescribed recipe (Docker invocation, shell script, validation command, build incantation) failed *as written* and a working substitute was discovered live, append a "Post-execution corrections" section to the plan describing the failure mode and the working recipe verbatim. Commit this on `main` after the implementation PR merges, in a focused commit separate from the artifact-commit (so the correction has its own message and shows up in `git log` searches for the recipe).
+
+This is the right pattern when:
+
+- The plan's recipe was authored against a different host OS than the executor's.
+- A pinned Docker image's bundled tooling (corepack, package manager, signing keys) drifted from what the plan assumed.
+- A validation command's API behavior didn't match the plan (e.g. a Playwright assertion failing on SVG `<path fill="none">` because of zero-area bounding boxes).
+
+Do **not** silently fix the recipe in the plan's head — that erases the lesson. Append, don't overwrite. A future reader regenerating the recipe on a fresh host needs to see both the original assumption and the discovered correction to know which constraints are load-bearing.
+
 ## Output Report
 
 Provide summary:

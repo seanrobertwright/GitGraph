@@ -68,6 +68,40 @@ Note on screenshot baselines: first local run will generate `tests/e2e/gutter-sc
 - **`structuredClone` is Node 22 native.** Already used in Phase 2 tests; no polyfill needed.
 - **GitHub Pages deploy untouched.** Phase 3 only adds files under `apps/docs/` if any (none planned); the existing `deploy.yml` workflow continues to work as-is.
 
+### Post-execution corrections (recorded after Phase 3 merged)
+
+The plan's task 17 Docker recipe (`docker run ... mcr.microsoft.com/playwright:v1.49.1-jammy bash -lc "corepack enable && pnpm install --frozen-lockfile && ..."`) fails on a Windows host as written. Three workarounds were needed, all unrelated to plan logic but load-bearing for baseline regeneration:
+
+1. **`corepack enable` fails inside the v1.49.1-jammy image** with `Error: Cannot find matching keyid` — bundled corepack can't verify rotated npm registry signing keys. Replace with `npm install -g pnpm@10.33.0`. (Newer Playwright images may bundle a corepack with refreshed keys; re-test before assuming this is needed.)
+2. **`pnpm install --frozen-lockfile` fails under `engine-strict=true`** because the image ships Node 22.12.0 and the lockfile contains `eslint-visitor-keys@5.0.1` (transitive via `eslint-config-next`) which requires Node ≥22.13. Bypass scoped to the Docker invocation only: `pnpm install --frozen-lockfile --config.engine-strict=false`. CI's `actions/setup-node@v4 with: node-version: 22` resolves to current 22.x and is unaffected. If we ever bump the Playwright image past `v1.49.1` (i.e. simultaneously bumping `@playwright/test`), this workaround becomes unnecessary.
+3. **`pnpm install` inside the bind-mounted repo throws `EACCES` on rename** for `node_modules/.pnpm/*/_tmp_*` → final names, because Windows NTFS-through-Docker-Desktop bind mounts don't always honor rename atomicity inside `node_modules`. Fix: mount anonymous volumes over the three `node_modules` dirs so pnpm operates on the container's ext4, not the host bind. Add to the `docker run` invocation:
+
+       -v "/work/node_modules"
+       -v "/work/apps/docs/node_modules"
+       -v "/work/examples/consumer-app/node_modules"
+
+   Note this requires deleting any existing host `node_modules` dirs first (otherwise the bind-mounted versions shadow the volumes during install).
+
+**Working PowerShell recipe (Phase 3, Windows host):**
+
+```powershell
+Get-ChildItem -Recurse -Filter node_modules -Directory | ForEach-Object { Remove-Item -Recurse -Force $_.FullName }
+docker run --rm --ipc=host `
+  -v "${PWD}:/work" `
+  -v "/work/node_modules" `
+  -v "/work/apps/docs/node_modules" `
+  -v "/work/examples/consumer-app/node_modules" `
+  -w /work -e CI=true `
+  mcr.microsoft.com/playwright:v1.49.1-jammy `
+  bash -lc "npm install -g pnpm@10.33.0 && pnpm install --frozen-lockfile --config.engine-strict=false && pnpm test:e2e --project=chromium --update-snapshots gutter-screenshots.spec.ts"
+```
+
+After running, `pnpm install --frozen-lockfile` on the host to restore the local `node_modules`.
+
+### Other deviations
+
+- **Theming spec — `toBeVisible()` doesn't work on SVG `<path fill="none">`.** The element has zero-area bounding box on Chromium and WebKit (Firefox is more lenient), so Playwright reports it hidden even when present and styled. Replaced with `toHaveAttribute("d", /.+/)`, which is functionally equivalent for "the locator resolved to a real path element" and passes on all 3 browsers. Future SVG-rendering plans should avoid `toBeVisible()` on stroke-only elements.
+
 ---
 
 ## CONTEXT REFERENCES

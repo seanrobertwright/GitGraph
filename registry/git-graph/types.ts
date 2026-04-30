@@ -13,12 +13,13 @@ export type Commit = {
   refs?: Ref[];
 };
 
-// Phase 2: `straight` = primary-parent edge (parents[0]),
-//          `merge`    = secondary-parent edge (parents[i>0]).
-// Phase 3 will add `fork` when bezier rendering needs to distinguish a
-// cross-lane primary-parent edge (branch tip rejoining ancestor lane) from
-// a same-lane one. For Phase 2, geometry is read off fromLane/toLane.
-export type EdgeKind = "straight" | "merge";
+// Edge classification.
+//   - `straight`: primary-parent edge whose child and parent share a lane.
+//   - `fork`:     primary-parent edge whose child and parent are on different
+//                 lanes (a branch tip rejoining its ancestor's lane).
+//   - `merge`:    secondary-parent edge (parents[i>0]) — always rendered as
+//                 a curve regardless of lane geometry.
+export type EdgeKind = "straight" | "fork" | "merge";
 
 export type LayoutRow = {
   commit: Commit;

@@ -22,7 +22,7 @@ export const featureBranchExpected: LayoutResult = {
     { fromSha: "m3", toSha: "f2", fromLane: 0, toLane: 1, fromRow: 0, toRow: 1, kind: "merge"    },
     { fromSha: "f2", toSha: "f1", fromLane: 1, toLane: 1, fromRow: 1, toRow: 3, kind: "straight" },
     { fromSha: "m2", toSha: "m1", fromLane: 0, toLane: 0, fromRow: 2, toRow: 4, kind: "straight" },
-    { fromSha: "f1", toSha: "m1", fromLane: 1, toLane: 0, fromRow: 3, toRow: 4, kind: "straight" },
+    { fromSha: "f1", toSha: "m1", fromLane: 1, toLane: 0, fromRow: 3, toRow: 4, kind: "fork"     },
   ],
   laneCount: 2,
 };

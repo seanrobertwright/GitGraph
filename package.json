@@ -7,6 +7,8 @@
   "scripts": {
     "dev:docs": "pnpm --filter docs dev",
     "dev:consumer": "pnpm --filter consumer-app dev -p 3100",
+    "prepare": "node scripts/sync-registry.mjs",
+    "sync": "node scripts/sync-registry.mjs",
     "build:docs": "pnpm --filter docs build",
     "lint": "pnpm -r --parallel lint",
     "typecheck": "pnpm -r --parallel typecheck && tsc -p tsconfig.json --noEmit",

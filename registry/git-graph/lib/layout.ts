@@ -80,6 +80,10 @@ export function computeLayout(commits: Commit[]): LayoutResult {
 
   const edges: LayoutEdge[] = partialEdges.map((e) => {
     const target = rowBySha.get(e.toSha)!;
+    let kind: EdgeKind = e.kind;
+    if (kind === "straight" && e.fromLane !== target.lane) {
+      kind = "fork";
+    }
     return {
       fromSha: e.fromSha,
       toSha: e.toSha,
@@ -87,7 +91,7 @@ export function computeLayout(commits: Commit[]): LayoutResult {
       toLane: target.lane,
       fromRow: e.fromRow,
       toRow: target.rowIndex,
-      kind: e.kind,
+      kind,
     };
   });
 

@@ -358,6 +358,16 @@ Skipping step 3 means `gh repo create --source .` or first-push-wins will make t
 
 **Native-binding pins.** If the plan pins a top-level package from an ecosystem that ships native bindings as separate transitive packages (Tailwind v4's `@tailwindcss/oxide` + `@tailwindcss/node`, Rollup's `@rollup/rollup-<platform>-*`, esbuild's `@esbuild/*`, swc's `@swc/core-<platform>-*`, lightningcss's `lightningcss-<platform>-*`, etc.), the plan must also pin those natives via `pnpm.overrides` (or npm `overrides` / yarn `resolutions`). Do not treat top-level pins as sufficient — the natives float across minor versions and their binary struct shapes change, producing runtime errors that never surface at `install` time.
 
+**Spike tasks: throwaway path + measurement recorded in the plan.** Any task labeled SPIKE must (a) live at a clearly throwaway path (`_spike/` page, `_spike-*.spec.ts`, etc. — never inlined into a production file), (b) conclude by editing the plan file itself to record the measured value in the relevant downstream task's body, with a comment citing the spike, and (c) end with deletion of the spike code. Without (b), the spike's output exists only in transient test logs and can't be audited later. Without (a), the executor is tempted to "just inline it" and skip the cleanup step. Spike code is throwaway; the *measurement* is permanent and lives in the plan.
+
+**Pre-PR scope confirmation as an explicit task.** Every plan whose final phase opens a PR must include a `CONFIRM` task immediately before `gh pr create` that runs:
+
+1. `git status` — confirm no untracked files outside `.agents/`. Anything else: gitignore proactively or revert.
+2. `git diff --name-only main...HEAD` — confirm every changed path is listed under "Primary Systems Affected" or is an explicitly planned new file.
+3. Verify `.agents/plans/<phase>.md`, `.agents/code-reviews/`, `.agents/execution-reports/`, `.agents/system-reviews/` are NOT staged on the feature branch (artifact-commit cadence: those land on `main` post-merge, never in the implementation PR).
+
+This is a checklist task, not a CLAUDE.md rule that may or may not be re-read. Sweep-in of unrelated tooling dirs and plan-file ride-along are recurring failure modes; automate the catch.
+
 <Continue with all tasks in dependency order...>
 
 ---

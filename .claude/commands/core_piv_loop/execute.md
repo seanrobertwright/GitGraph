@@ -81,9 +81,25 @@ Grouping multiple destructive actions into one confirmation is fine — show the
 
 Reversible local actions (editing files, running tests, running builds, restarting local dev servers) do not need confirmation.
 
-#### f. `git status` before `gh pr create`
+#### f. Pre-PR scope check (mandatory)
 
-Before opening any PR, run `git status` and surface every untracked file or unstaged change to the user as an explicit decision point — not a passive warning the executor scrolls past. For each, decide together: include in this PR, commit separately on the branch first, or leave for a post-merge follow-up. `gh pr create`'s own "N untracked changes" warning is too easy to ignore and produces dirty PRs or surprise leftovers on the working tree post-merge.
+Before invoking `gh pr create`, run all three checks. Each one is non-negotiable — surface results to the user as an explicit decision point, not a passive warning to scroll past.
+
+1. **`git status`** — surface every untracked file or unstaged change. For each, decide together with the user: include in this PR, commit separately on the branch first, or leave for a post-merge follow-up. Untracked local-tool scratch dirs (`.kilocode/`, `.pi/`, `.qoder/`, `.agents/skills/`, `skills-lock.json`, editor configs, etc.) must be added to `.gitignore` *before* the PR opens — never after, because the GitHub squash UI will sweep them in alongside the implementation.
+
+2. **`git diff --name-only main...HEAD`** — confirm every changed path is in the plan's "Primary Systems Affected" or is an explicitly planned new file. Anything outside that scope is a sweep-in to triage: revert it, gitignore it, or expand the plan's scope with a brief rationale before proceeding. Do not let unrelated changes ride along.
+
+3. **Plan-file location.** If `.agents/plans/<phase>.md` is staged or committed on the feature branch, *move it to a post-merge commit on `main`* per CLAUDE.md's artifact-commit cadence. **Do not let a plan file ride along in an implementation PR.** Same goes for `.agents/code-reviews/`, `.agents/execution-reports/`, `.agents/system-reviews/` — those land in the post-merge artifact-commit, not the implementation PR.
+
+`gh pr create`'s own "N untracked changes" warning is too easy to ignore and produces dirty PRs or surprise leftovers on the working tree post-merge. The three-step audit above catches both that class and the plan-file-ride-along class in one pass.
+
+#### g. Plan-prescribed throwaway artifacts (spikes)
+
+When a plan instructs creating a `_spike/` page or `_spike-*.spec.ts` (or any equivalent throwaway artifact), **create those exact files** at the prescribed paths. Do not inline the measurement into a production page or spec, even if it would be faster. The throwaway path is part of the plan's audit trail — the spike's value is not just the number it produces but the recorded measurement run and the clean separation from production code.
+
+The measurement *value* gets recorded permanently in the plan body (in the relevant downstream task, with a comment citing the spike) before the spike code is deleted. Without that, the spike's output exists only in transient test logs and can't be audited later.
+
+If the plan's spike recipe genuinely doesn't fit the situation, append a "Post-execution corrections" section to the plan rather than silently substituting an inlined approach.
 
 ### 3. Implement Testing Strategy
 

@@ -63,5 +63,11 @@ describe("relativeTime", () => {
     it("future timestamp clamped to just now", () => {
       expect(relativeTime(NOW + 5_000, NOW)).toBe("just now");
     });
+    it("numeric string parsed as unix-ms", () => {
+      expect(relativeTime(String(NOW - 5 * 60_000), NOW)).toBe("5m");
+    });
+    it("whitespace around numeric string is tolerated", () => {
+      expect(relativeTime(`  ${NOW - 60_000}  `, NOW)).toBe("1m");
+    });
   });
 });

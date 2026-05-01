@@ -42,3 +42,6 @@ export type LayoutResult = {
   edges: LayoutEdge[];
   laneCount: number;
 };
+
+export { GitGraphInputError } from "./lib/errors";
+export type { GitGraphInputErrorKind } from "./lib/errors";

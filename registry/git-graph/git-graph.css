@@ -24,6 +24,19 @@
   --graph-stroke-width: 1.5px;
   --graph-lane-width: 16px;
   --graph-row-height: 40px;
+
+  --graph-row-hover-bg: hsl(220 14% 96%);
+  --graph-row-selected-bg: hsl(220 14% 92%);
+  --graph-row-selected-border: hsl(220 80% 55%);
+
+  --graph-ref-branch-bg: hsl(145 60% 92%);
+  --graph-ref-branch-fg: hsl(145 60% 25%);
+  --graph-ref-tag-bg: hsl(35 90% 92%);
+  --graph-ref-tag-fg: hsl(35 90% 25%);
+  --graph-ref-remote-bg: hsl(220 30% 92%);
+  --graph-ref-remote-fg: hsl(220 30% 30%);
+
+  --graph-working-tree-fg: hsl(0 0% 50%);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -36,5 +49,25 @@
     --graph-branch-6: hsl(190 75% 60%);
     --graph-branch-7: hsl(60 80% 60%);
     --graph-branch-8: hsl(320 65% 65%);
+
+    --graph-row-hover-bg: hsl(240 4% 14%);
+    --graph-row-selected-bg: hsl(240 4% 20%);
+    --graph-row-selected-border: hsl(220 80% 65%);
+
+    --graph-ref-branch-bg: hsl(145 60% 18%);
+    --graph-ref-branch-fg: hsl(145 60% 75%);
+    --graph-ref-tag-bg: hsl(35 90% 18%);
+    --graph-ref-tag-fg: hsl(35 90% 75%);
+    --graph-ref-remote-bg: hsl(220 30% 22%);
+    --graph-ref-remote-fg: hsl(220 30% 80%);
+
+    --graph-working-tree-fg: hsl(0 0% 60%);
   }
+}
+
+.git-graph-row:hover {
+  background: var(--graph-row-hover-bg);
+}
+.git-graph-row[data-selected="true"]:hover {
+  background: var(--graph-row-selected-bg);
 }

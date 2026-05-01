@@ -22,12 +22,12 @@ export function fromGitLog(text: string): Commit[] {
     const email = parts[4]!;
     const message = parts.slice(5).join("\t");
     const parents = parentsRaw === "" ? [] : parentsRaw.split(" ");
-    const timestamp = Number(ctRaw) * 1000;
-    if (!Number.isFinite(timestamp)) {
+    if (!/^\d+$/.test(ctRaw)) {
       throw new Error(
         `fromGitLog: malformed timestamp on line ${i + 1}: ${ctRaw}`,
       );
     }
+    const timestamp = Number(ctRaw) * 1000;
     commits.push({
       sha,
       parents,

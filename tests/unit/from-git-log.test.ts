@@ -62,6 +62,16 @@ describe("fromGitLog", () => {
     expect(() => fromGitLog(line)).toThrow(/malformed timestamp on line 1/);
   });
 
+  it("throws on empty timestamp (would silently produce timestamp=0 otherwise)", () => {
+    const line = ["abc", "", "", "X", "x@x.com", "msg"].join("\t");
+    expect(() => fromGitLog(line)).toThrow(/malformed timestamp on line 1/);
+  });
+
+  it("throws on whitespace-only timestamp (would silently produce timestamp=0 otherwise)", () => {
+    const line = ["abc", "", "   ", "X", "x@x.com", "msg"].join("\t");
+    expect(() => fromGitLog(line)).toThrow(/malformed timestamp on line 1/);
+  });
+
   it("strips trailing \\r from CRLF line endings", () => {
     const line = ["abc", "", "1700000000", "X", "x@x.com", "msg"].join("\t");
     const result = fromGitLog(line + "\r\n");

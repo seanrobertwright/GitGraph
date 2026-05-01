@@ -18,3 +18,10 @@ playwright/.cache/
 
 # Synced from registry/git-graph by scripts/sync-registry.mjs.
 examples/consumer-app/components/git-graph/
+
+# Local agent / IDE-tool config that should not be tracked.
+.kilocode/
+.pi/
+.qoder/
+.agents/skills/
+skills-lock.json

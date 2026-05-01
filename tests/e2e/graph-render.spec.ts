@@ -1,14 +1,23 @@
 import { expect, test } from "@playwright/test";
+import {
+  featureBranchFixture,
+  linearFixture,
+  longLivedReleaseFixture,
+  mergeFixture,
+  octopusFixture,
+  orphanFixture,
+  withRefsFixture,
+} from "../unit/fixtures";
 
-const FIXTURES: Array<{ name: string; rowCount: number }> = [
-  { name: "linear", rowCount: 4 },
-  { name: "feature-branch", rowCount: 5 },
-  { name: "merge", rowCount: 4 },
-  { name: "octopus", rowCount: 5 },
-  { name: "orphan", rowCount: 4 },
-  { name: "long-lived-release", rowCount: 9 },
-  { name: "with-refs", rowCount: 5 },
-];
+const FIXTURES = [
+  { name: "linear", rowCount: linearFixture.length },
+  { name: "feature-branch", rowCount: featureBranchFixture.length },
+  { name: "merge", rowCount: mergeFixture.length },
+  { name: "octopus", rowCount: octopusFixture.length },
+  { name: "orphan", rowCount: orphanFixture.length },
+  { name: "long-lived-release", rowCount: longLivedReleaseFixture.length },
+  { name: "with-refs", rowCount: withRefsFixture.length },
+] as const;
 
 test.describe("graph render", () => {
   for (const { name, rowCount } of FIXTURES) {

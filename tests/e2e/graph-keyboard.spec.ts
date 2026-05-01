@@ -56,11 +56,6 @@ test.describe("graph keyboard navigation", () => {
     // featureBranchFixture has 5 rows; press ArrowDown 5x to reach the last row.
     for (let i = 0; i < 5; i++) await page.keyboard.press("ArrowDown");
     const lastRow = page.locator('[data-testid="git-graph-row"][data-row-index="4"]');
-    const box = await lastRow.boundingBox();
-    expect(box).not.toBeNull();
-    if (box) {
-      expect(box.y).toBeGreaterThanOrEqual(0);
-      expect(box.y + box.height).toBeLessThanOrEqual(200 + 1);
-    }
+    await expect(lastRow).toBeInViewport();
   });
 });

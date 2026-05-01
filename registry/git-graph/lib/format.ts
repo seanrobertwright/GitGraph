@@ -10,7 +10,13 @@ const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
 
 export function relativeTime(ts: number | string, now: number = Date.now()): string {
-  const parsed = typeof ts === "number" ? ts : Date.parse(ts);
+  let parsed: number;
+  if (typeof ts === "number") {
+    parsed = ts;
+  } else {
+    const trimmed = ts.trim();
+    parsed = /^-?\d+$/.test(trimmed) ? Number(trimmed) : Date.parse(trimmed);
+  }
   if (Number.isNaN(parsed)) return "unknown";
   const delta = Math.max(0, now - parsed);
   if (delta < MINUTE) return "just now";

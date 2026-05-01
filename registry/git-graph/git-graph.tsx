@@ -1,6 +1,14 @@
 "use client";
 
-import { useId, useMemo, useState, type CSSProperties, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+} from "react";
 import GitGraphGutter from "./git-graph-gutter";
 import { computeLayout } from "./lib/layout";
 import { relativeTime, shortSha } from "./lib/format";
@@ -57,9 +65,24 @@ export default function GitGraph(props: GitGraphProps) {
   }, [commits, showWorkingTreeRow, head]);
 
   const [internalSelected, setInternalSelected] = useState<string | undefined>(
-    props.defaultSelectedSha,
+    props.selectedSha ?? props.defaultSelectedSha,
   );
   const isControlled = props.selectedSha !== undefined;
+  // Mirror the controlled prop into internal state on every change so internal
+  // tracks the consumer's intent rather than whatever the user clicked last.
+  // Skips the initial mount (otherwise an uncontrolled-only consumer with
+  // defaultSelectedSha would have it overwritten to undefined). On a
+  // controlled→uncontrolled transition (prop drops to undefined), this clears
+  // internal — matching the typical "consumer set selection to undefined =
+  // clear" intent.
+  const isFirstRunRef = useRef(true);
+  useEffect(() => {
+    if (isFirstRunRef.current) {
+      isFirstRunRef.current = false;
+      return;
+    }
+    setInternalSelected(props.selectedSha);
+  }, [props.selectedSha]);
   const selectedSha = isControlled ? props.selectedSha : internalSelected;
 
   function setSelected(next: string | undefined) {

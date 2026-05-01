@@ -1,4 +1,5 @@
 import type { Commit, EdgeKind, LayoutEdge, LayoutResult, LayoutRow } from "../types";
+import { GitGraphInputError } from "./errors";
 
 // Throws on duplicate shas or cycles in the commit graph. Unknown parents
 // (referenced in `parents[]` but not present in `commits`) are silently
@@ -10,14 +11,21 @@ export function computeLayout(commits: Commit[]): LayoutResult {
   const bySha = new Map<string, Commit>();
   for (const c of commits) {
     if (bySha.has(c.sha)) {
-      throw new Error(`computeLayout: duplicate sha in input: ${c.sha}`);
+      throw new GitGraphInputError(
+        "duplicate-sha",
+        `computeLayout: duplicate sha in input: ${c.sha}`,
+        c.sha,
+      );
     }
     bySha.set(c.sha, c);
   }
 
   const sorted = topoSort(commits, bySha);
   if (sorted.length !== commits.length) {
-    throw new Error("computeLayout: cycle detected in commit graph");
+    throw new GitGraphInputError(
+      "cycle",
+      "computeLayout: cycle detected in commit graph",
+    );
   }
 
   const lanes: (string | null)[] = [];
@@ -116,7 +124,10 @@ function toTimestampNumber(t: number | string): number {
   if (typeof t === "number") return t;
   const n = Date.parse(t);
   if (Number.isNaN(n)) {
-    throw new Error(`computeLayout: unparseable timestamp string: ${t}`);
+    throw new GitGraphInputError(
+      "unparseable-timestamp",
+      `computeLayout: unparseable timestamp string: ${t}`,
+    );
   }
   return n;
 }

@@ -76,6 +76,7 @@ type GitGraphState = {
   gutterWidth: number;
   onCommitClick: ((commit: Commit) => void) | undefined;
   onCommitHover: ((commit: Commit | null) => void) | undefined;
+  justAppended: Set<string>;
 };
 
 function useGitGraphState(props: GitGraphProps): GitGraphState {
@@ -122,6 +123,17 @@ function useGitGraphState(props: GitGraphProps): GitGraphState {
   const rootClassName = rootClassNameFor(props);
   const gutterWidth = layout.laneCount * laneWidth;
 
+  const prevShasRef = useRef<Set<string> | null>(null);
+  const justAppended = useMemo<Set<string>>(() => {
+    const currShas = new Set(layout.rows.map((r) => r.commit.sha));
+    const prev = prevShasRef.current;
+    prevShasRef.current = currShas;
+    if (prev === null) return new Set();
+    const added = new Set<string>();
+    for (const s of currShas) if (!prev.has(s)) added.add(s);
+    return added;
+  }, [layout.rows]);
+
   return {
     layout,
     laneWidth,
@@ -137,6 +149,7 @@ function useGitGraphState(props: GitGraphProps): GitGraphState {
     gutterWidth,
     onCommitClick: props.onCommitClick,
     onCommitHover: props.onCommitHover,
+    justAppended,
   };
 }
 
@@ -162,6 +175,7 @@ function GitGraphBody({ state, virtualItems, totalSize, scrollToIndex }: GitGrap
     gutterWidth,
     onCommitClick,
     onCommitHover,
+    justAppended,
   } = state;
 
   // Keep the selected row mounted so `aria-activedescendant` always points at
@@ -275,6 +289,7 @@ function GitGraphBody({ state, virtualItems, totalSize, scrollToIndex }: GitGrap
             data-row-index={row.rowIndex}
             {...(isSelected ? { "data-selected": "true" } : {})}
             {...(isWorkingTree ? { "data-working-tree": "true" } : {})}
+            {...(justAppended.has(row.commit.sha) ? { "data-just-appended": "true" } : {})}
             className="git-graph-row"
             style={rowStyle}
             onClick={() => {

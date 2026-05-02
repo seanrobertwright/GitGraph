@@ -381,15 +381,15 @@ Pure modules first. Errors class, `validate()`, `fromGitLog()`, plus the three n
 
 Frame-budget spike (**pre-run during plan write 2026-05-01**, see results below). Refactor `<GitGraphGutter>` for windowed `range`. Integrate `useVirtualizer`/`useWindowVirtualizer` into `<GitGraph>`. New large fixture captured from `react`. New `/graph/large` harness page. New virtualization E2E.
 
-**Pre-run spike results** (10000 synthetic rows, `useVirtualizer` with overscan 8, ~30 stepped scrolls × 100ms over a 600px-tall scroll container, `examples/consumer-app/app/spike-virt/page.tsx` + `tests/e2e/_spike-virt-perf.spec.ts` — both temp probes already removed):
+**Spike results** — execute-time, against the real `<GitGraph>` row (10000 commits captured from `facebook/react`, 600px scroll container, 30 stepped scrolls × 100ms, `useVirtualizer` overscan 8). Pre-run synthetic-row measurements (chromium 24, firefox 28, webkit 59) are in commit history.
 
 | Browser | max frame | p99 | p95 | median | n |
 |---|---|---|---|---|---|
-| chromium | 24 ms | 22 ms | 21 ms | 17 ms | 204 |
-| firefox | 28 ms | 23 ms | 21 ms | 17 ms | 211 |
-| **webkit** | **59 ms** | **50 ms** | 43 ms | 28 ms | 126 |
+| chromium | 27 ms | 25 ms | 22 ms | 17 ms | 203 |
+| firefox | 38 ms | 37 ms | 24 ms | 17 ms | 209 |
+| **webkit** | **60 ms** | **59 ms** | 55 ms | 28 ms | 117 |
 
-Threshold for the production perf assertion in `tests/e2e/graph-virtualization.spec.ts`: **`MAX_FRAME_MS = 100`** — 1.7× headroom over the worst observed (webkit max 59ms), catches a broken virtualizer (which would produce 200–2000ms+ frames) without being flaky on slow CI runners. The execute-time spike runs against the *real* `<GitGraph>` row component (which has slightly more cost per row than the spike's bare row: ref badges, format-time call, etc.) — if the real-component spike's worst case exceeds 80 ms, raise `MAX_FRAME_MS` to `worst-real * 1.5` rounded up to 25 ms; otherwise leave at 100.
+Worst real-row max (webkit 60 ms) is ≤ 80 ms threshold → **`MAX_FRAME_MS = 100`** for the production perf assertion in `tests/e2e/graph-virtualization.spec.ts`. 1.7× headroom over the worst observed; catches a broken virtualizer (which would produce 200–2000 ms+ frames) without being flaky on slow CI runners.
 
 ### Phase C — Animation
 
@@ -1384,3 +1384,42 @@ Inlined verbatim in §"REPLACE useEffect mirror with isControlled snapshot + dev
 ### rAF-delta scroll-perf pattern (already in §SPIKE task)
 
 Inlined verbatim in §"SPIKE — refine 10k virtualization frame budget" — see that task for the full snippet. The Phase B production spec `tests/e2e/graph-virtualization.spec.ts` should mirror this exact pattern.
+
+---
+
+## Post-execution corrections
+
+### Phase B SPIKE harness path — `_spike` is excluded from Next App Router routing
+
+**Failure mode (executed 2026-05-01):** The plan prescribed the spike harness at `examples/consumer-app/app/graph/_spike/page.tsx`. Next.js App Router treats folders prefixed with `_` as **private folders** and excludes them from routing, so `GET /graph/_spike` returned a 200 wrapper but no route content (the page never resolved). Playwright's `waitForSelector('[data-testid="git-graph-row"]')` timed out across all 3 browsers.
+
+**Working substitute:** Use a non-underscore folder name. Executed-time recipe:
+
+- Spike page path: `examples/consumer-app/app/graph/spike-virt/page.tsx` (no leading underscore).
+- Spec navigates to `/graph/spike-virt`.
+- Spec filename `tests/e2e/_spike-virt-perf.spec.ts` keeps its underscore — that's a filename convention, not a route.
+
+The pre-run plan-write spike (the source of the "Pre-run spike results" table that this corrections section's parent §Phase B has since replaced) likely used a different folder name; the underscore variant in the plan body was a transcription error.
+
+Reference: [Next.js App Router private folders docs](https://nextjs.org/docs/app/getting-started/project-structure#private-folders).
+
+### Phase B virtualization — `useVirtualizer` with parent-owned `scrollContainerRef` needs a state-based element capture
+
+**Failure mode (executed 2026-05-01):** With the plan's recipe — `useVirtualizer({ getScrollElement: () => props.scrollContainerRef.current })` where `scrollContainerRef` is created in the parent component and attached to a parent `<div ref={...}>` — the virtualizer reports `getTotalSize()` correctly but `getVirtualItems()` stays empty indefinitely, because `props.scrollContainerRef.current` is `null` on `<GitGraph>`'s first render (the parent's ref attachment hasn't committed yet) and there's no re-render to trigger the virtualizer to re-evaluate `getScrollElement`. TanStack's standard examples co-locate the ref and the virtualizer in the same component, so this timing concern doesn't surface there.
+
+**Working substitute:** Inside `GitGraphInElement`, capture the parent's element into local state via a post-mount effect. The state update triggers a re-render where the virtualizer's `getScrollElement` returns a real element and items appear:
+
+```tsx
+const [scrollEl, setScrollEl] = useState<HTMLElement | null>(null);
+useEffect(() => {
+  setScrollEl(props.scrollContainerRef.current);
+}, [props.scrollContainerRef]);
+const virtualizer = useVirtualizer({
+  count: state.layout.rows.length,
+  getScrollElement: () => scrollEl,
+  estimateSize: () => state.rowHeight,
+  overscan: DEFAULTS.overscan,
+});
+```
+
+This shipped in the Phase B implementation. Plan §Phase B GOTCHA 2 ("returns null on the first render… TanStack handles this") was incorrect — TanStack does not retry without a render trigger when the ref lives outside the virtualizer's component.

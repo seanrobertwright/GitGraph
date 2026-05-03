@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "../components/git-graph/git-graph.css";
 
 export const metadata: Metadata = {
   title: "GitGraph",

@@ -3,6 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
+    "predev": "node ../../scripts/sync-registry.mjs --dest=apps/docs/components/git-graph",
+    "prebuild": "node ../../scripts/sync-registry.mjs --dest=apps/docs/components/git-graph",
+    "prelint": "node ../../scripts/sync-registry.mjs --dest=apps/docs/components/git-graph",
+    "pretypecheck": "node ../../scripts/sync-registry.mjs --dest=apps/docs/components/git-graph",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -21,6 +25,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "3.2.0",
     "@tailwindcss/postcss": "4.0.0",
+    "@tailwindcss/typography": "0.5.16",
     "@types/react": "19.0.7",
     "@types/react-dom": "19.0.3",
     "eslint": "9.18.0",

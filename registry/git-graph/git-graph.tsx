@@ -17,6 +17,7 @@ import {
 } from "@tanstack/react-virtual";
 import GitGraphGutter from "./git-graph-gutter";
 import { computeLayout } from "./lib/layout";
+import { GitGraphInputError, type GitGraphInputErrorKind } from "./lib/errors";
 import { relativeTime, shortSha } from "./lib/format";
 import { WORKING_TREE_SHA, synthesizeWorkingTreeCommit } from "./lib/working-tree";
 import type { Commit, LayoutResult, Ref } from "./types";
@@ -79,37 +80,55 @@ type GitGraphState = {
   justAppended: Set<string>;
 };
 
-function useGitGraphState(props: GitGraphProps): GitGraphState {
+type LayoutOrError =
+  | { ok: true; layout: LayoutResult }
+  | { ok: false; kind: GitGraphInputErrorKind };
+
+function useLayoutOrError(props: GitGraphProps): LayoutOrError {
+  const { commits, showWorkingTreeRow, head } = props;
+  return useMemo<LayoutOrError>(() => {
+    try {
+      const workingCommits = showWorkingTreeRow
+        ? [synthesizeWorkingTreeCommit(head, Date.now()), ...commits]
+        : commits;
+      return { ok: true, layout: computeLayout(workingCommits) };
+    } catch (e) {
+      if (e instanceof GitGraphInputError) return { ok: false, kind: e.kind };
+      throw e;
+    }
+  }, [commits, showWorkingTreeRow, head]);
+}
+
+function useGitGraphState(props: GitGraphProps, layout: LayoutResult): GitGraphState {
   const laneWidth = props.laneWidth ?? DEFAULTS.laneWidth;
   const rowHeight = props.rowHeight ?? DEFAULTS.rowHeight;
   const nodeRadius = props.nodeRadius ?? DEFAULTS.nodeRadius;
   const strokeWidth = props.strokeWidth ?? DEFAULTS.strokeWidth;
 
-  const { commits, showWorkingTreeRow, head } = props;
-
-  const layout = useMemo(() => {
-    const workingCommits = showWorkingTreeRow
-      ? [synthesizeWorkingTreeCommit(head, Date.now()), ...commits]
-      : commits;
-    return computeLayout(workingCommits);
-  }, [commits, showWorkingTreeRow, head]);
-
   const [internalSelected, setInternalSelected] = useState<string | undefined>(
     props.selectedSha ?? props.defaultSelectedSha,
   );
-  const isControlled = props.selectedSha !== undefined;
-  const isFirstRunRef = useRef(true);
-  useEffect(() => {
-    if (isFirstRunRef.current) {
-      isFirstRunRef.current = false;
-      return;
+  const isControlledRef = useRef<boolean>(props.selectedSha !== undefined);
+  // Guard the dev-warn so a repeated render after a mode switch doesn't spam
+  // the console. Mutating a ref during render is React-sanctioned for caching;
+  // strict-mode's double-render of this body sets the ref true on the first
+  // pass, suppressing the second. (Findings #1 and #2 of phase-5d review.)
+  const hasWarnedModeSwitchRef = useRef(false);
+  if (process.env.NODE_ENV !== "production") {
+    const currentlyControlled = props.selectedSha !== undefined;
+    if (currentlyControlled !== isControlledRef.current && !hasWarnedModeSwitchRef.current) {
+      console.warn(
+        "GitGraph: switching between controlled and uncontrolled `selectedSha` is not supported. " +
+          "Component will continue using the mode it was first rendered with.",
+      );
+      hasWarnedModeSwitchRef.current = true;
     }
-    setInternalSelected(props.selectedSha);
-  }, [props.selectedSha]);
+  }
+  const isControlled = isControlledRef.current;
   const selectedSha = isControlled ? props.selectedSha : internalSelected;
 
   function setSelected(next: string | undefined) {
-    setInternalSelected(next);
+    if (!isControlled) setInternalSelected(next);
     props.onSelectChange?.(next);
   }
 
@@ -235,6 +254,7 @@ function GitGraphBody({ state, virtualItems, totalSize, scrollToIndex }: GitGrap
       className={rootClassName}
       style={containerStyle}
       onKeyDown={onKeyDown}
+      onMouseLeave={() => onCommitHover?.(null)}
       {...(selectedRow ? { "aria-activedescendant": rowId(selectedRow.rowIndex) } : {})}
     >
       {first && last && (
@@ -297,7 +317,6 @@ function GitGraphBody({ state, virtualItems, totalSize, scrollToIndex }: GitGrap
               onCommitClick?.(row.commit);
             }}
             onMouseEnter={() => onCommitHover?.(row.commit)}
-            onMouseLeave={() => onCommitHover?.(null)}
           >
             <span
               style={{
@@ -375,9 +394,12 @@ function GitGraphBody({ state, virtualItems, totalSize, scrollToIndex }: GitGrap
 }
 
 function GitGraphInElement(
-  props: GitGraphProps & { scrollContainerRef: RefObject<HTMLElement | null> },
+  props: GitGraphProps & {
+    scrollContainerRef: RefObject<HTMLElement | null>;
+    layout: LayoutResult;
+  },
 ) {
-  const state = useGitGraphState(props);
+  const state = useGitGraphState(props, props.layout);
   // The parent owns the scroll-container ref. On our first render its
   // .current is still null because the parent's <div ref={...}> commits
   // its ref attachment after our render returns. Capturing the element
@@ -403,8 +425,8 @@ function GitGraphInElement(
   );
 }
 
-function GitGraphInWindow(props: GitGraphProps) {
-  const state = useGitGraphState(props);
+function GitGraphInWindow(props: GitGraphProps & { layout: LayoutResult }) {
+  const state = useGitGraphState(props, props.layout);
   const virtualizer = useWindowVirtualizer({
     count: state.layout.rows.length,
     estimateSize: () => state.rowHeight,
@@ -421,6 +443,13 @@ function GitGraphInWindow(props: GitGraphProps) {
 }
 
 export default function GitGraph(props: GitGraphProps) {
+  // Hooks must run unconditionally — useLayoutOrError is called every render,
+  // including when commits is empty (computeLayout([]) returns an empty layout).
+  const layoutResult = useLayoutOrError(props);
+  // Dedupe the dev-mode console.error per error kind so re-renders with the
+  // same bad input don't spam (and strict-mode's double-render emits once).
+  const reportedKindRef = useRef<GitGraphInputErrorKind | null>(null);
+
   if (props.commits.length === 0 && !props.showWorkingTreeRow) {
     return (
       <div
@@ -433,13 +462,36 @@ export default function GitGraph(props: GitGraphProps) {
     );
   }
 
+  if (!layoutResult.ok) {
+    if (
+      process.env.NODE_ENV !== "production" &&
+      reportedKindRef.current !== layoutResult.kind
+    ) {
+      console.error(
+        `GitGraph: input rejected (${layoutResult.kind}) — see lib/errors.ts for the kind union.`,
+      );
+      reportedKindRef.current = layoutResult.kind;
+    }
+    return (
+      <div
+        data-testid="git-graph-error"
+        data-error-kind={layoutResult.kind}
+        role="alert"
+        className={rootClassNameFor(props)}
+      >
+        GitGraph: invalid commit graph ({layoutResult.kind})
+      </div>
+    );
+  }
+
   if (props.scrollContainerRef) {
     return (
       <GitGraphInElement
         {...props}
         scrollContainerRef={props.scrollContainerRef}
+        layout={layoutResult.layout}
       />
     );
   }
-  return <GitGraphInWindow {...props} />;
+  return <GitGraphInWindow {...props} layout={layoutResult.layout} />;
 }

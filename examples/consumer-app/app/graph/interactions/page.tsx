@@ -4,8 +4,14 @@ import { useState } from "react";
 import GitGraph from "@/components/git-graph/git-graph";
 import { featureBranchFixture } from "../../../../../tests/unit/fixtures";
 
+// Empty string is the "no selection" sentinel: it's deliberately falsy for
+// the component's `selectedSha ? rows.find(...) : undefined` check, while
+// still being a defined string so `selectedSha={selected}` always passes a
+// value. That keeps GitGraph in controlled-from-mount mode and avoids the
+// uncontrolled→controlled dev-warn this harness is explicitly NOT testing
+// (see /graph/interactions-modeswitch for that case).
 export default function GraphInteractionsPage() {
-  const [selected, setSelected] = useState<string | undefined>(undefined);
+  const [selected, setSelected] = useState<string>("");
   const [lastClicked, setLastClicked] = useState<string | null>(null);
   const [lastHover, setLastHover] = useState<string | null>(null);
 
@@ -29,7 +35,7 @@ export default function GraphInteractionsPage() {
         <button
           type="button"
           data-testid="clear-selection"
-          onClick={() => setSelected(undefined)}
+          onClick={() => setSelected("")}
           className="rounded-md border px-3 py-1 text-sm"
         >
           clear
@@ -39,8 +45,8 @@ export default function GraphInteractionsPage() {
       <GitGraph
         commits={featureBranchFixture}
         head="m3"
-        {...(selected !== undefined ? { selectedSha: selected } : {})}
-        onSelectChange={setSelected}
+        selectedSha={selected}
+        onSelectChange={(s) => setSelected(s ?? "")}
         onCommitClick={(c) => setLastClicked(c.sha)}
         onCommitHover={(c) => setLastHover(c?.sha ?? null)}
       />

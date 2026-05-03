@@ -18,12 +18,17 @@
   --graph-branch-8: 0 0% 50%;
 }
 
-@media (prefers-color-scheme: dark) {
-  @theme {
-    --color-background: hsl(240 10% 3.9%);
-    --color-foreground: hsl(0 0% 98%);
-    --color-muted: hsl(240 3.7% 15.9%);
-    --color-muted-foreground: hsl(240 5% 64.9%);
-    --color-border: hsl(240 3.7% 15.9%);
-  }
+/* Dark-mode token overrides. Driven by a data-theme attribute on <html> set
+   by an inline script in layout.tsx (which reads prefers-color-scheme). We
+   don't use a @media (prefers-color-scheme: dark) block here because Tailwind
+   v4's compiler hoists any rule inside that media query into a @theme block,
+   which is compile-time only and inert at runtime — so the dark tokens never
+   actually applied. Attribute-driven keeps the override as plain CSS that
+   Tailwind passes through unchanged. */
+html[data-theme="dark"] {
+  --color-background: hsl(240 10% 3.9%);
+  --color-foreground: hsl(0 0% 98%);
+  --color-muted: hsl(240 3.7% 15.9%);
+  --color-muted-foreground: hsl(240 5% 64.9%);
+  --color-border: hsl(240 3.7% 15.9%);
 }

@@ -1423,3 +1423,37 @@ const virtualizer = useVirtualizer({
 ```
 
 This shipped in the Phase B implementation. Plan §Phase B GOTCHA 2 ("returns null on the first render… TanStack handles this") was incorrect — TanStack does not retry without a render trigger when the ref lives outside the virtualizer's component.
+
+### Phase C animation-timing test — measure animation duration, not click-to-end roundtrip
+
+**Failure mode (executed 2026-05-02):** The plan's Phase C E2E Test 5 wording — "wait for `animationend` event on the new row; verify event fires within ~250ms (150ms + slack)" — was naturally read as "set up the listener, click append, measure setup→`animationend`". Implemented that way the chromium dev-server run measured 686 ms (>250 ms threshold) because the elapsed window includes the click-roundtrip, React render, and DOM-paint latency before the keyframe even starts. Firefox/webkit happened to land under the threshold but were not reliably so.
+
+**Working substitute:** Measure the keyframe duration itself by capturing `animationstart` and `animationend` in the page, and assert the delta between them (≈150 ms keyframe + browser jitter). The 100–400 ms window catches a broken keyframe (instant 0 ms or runaway >1 s) without flaking on dev-server jitter:
+
+```ts
+const ended = page.evaluate(() => new Promise<number>((resolve) => {
+  let started = 0;
+  document.addEventListener("animationstart", (e) => {
+    if ((e.target as HTMLElement).matches('[data-just-appended="true"]')) {
+      started = performance.now();
+    }
+  }, { once: true });
+  document.addEventListener("animationend", (e) => {
+    if ((e.target as HTMLElement).matches('[data-just-appended="true"]')) {
+      resolve(performance.now() - started);
+    }
+  }, { once: true });
+}));
+await page.getByTestId("append-commit").click();
+const elapsed = await ended;
+expect(elapsed).toBeGreaterThan(100);
+expect(elapsed).toBeLessThan(400);
+```
+
+This shipped in `tests/e2e/graph-animation.spec.ts` (PR #9). Lesson: when a test is meant to verify a CSS keyframe **duration**, the measurement boundaries must be `animationstart` and `animationend` — not "any time before the click" and `animationend`.
+
+### Phase C chromium screenshot baselines drifted in CI — unrelated regression observed during Phase C merge
+
+**Failure mode (CI run 25258969130, 2026-05-02):** The Phase C PR's `e2e (chromium)` job failed not on `graph-animation.spec.ts` (all 5 animation tests passed across all 3 browsers) but on `graph-screenshots.spec.ts` baselines `graph-feature-branch-chromium-linux.png` (2368 px diff, 0.02 ratio) and `graph-with-refs-chromium-linux.png` (2953 px diff, 0.02 ratio). PR was merged with the failing check.
+
+**Working substitute (deferred):** Phase C did not modify any rendering code that those baselines exercise — the `data-just-appended` attribute is absent on the screenshot pages and the new `@keyframes`/`@media` rules don't apply without that attribute. Two plausible causes: (a) chromium-on-CI nondeterminism in font/anti-alias rendering that has been latent until now, or (b) the Phase B virtualization changes shifted absolute positioning by sub-pixel amounts and the baselines were last regenerated before that change. Either way, regenerating baselines is the right next step — record as carry-forward into Phase D's "Inherited findings" so a screenshot regen is included with the next branch's pre-PR run. Per CLAUDE.md "deferred code-review findings" rule.

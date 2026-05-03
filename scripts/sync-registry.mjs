@@ -9,6 +9,11 @@ import { mkdir, readdir, rm, copyFile, stat } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+if (process.env.SKIP_REGISTRY_SYNC === "1") {
+  console.log("[sync-registry] SKIP_REGISTRY_SYNC=1, skipping.");
+  process.exit(0);
+}
+
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "..");
 const SRC = resolve(repoRoot, "registry/git-graph");

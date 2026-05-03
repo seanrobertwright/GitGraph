@@ -58,3 +58,50 @@ jobs:
           name: playwright-report-${{ matrix.browser }}
           path: playwright-report/
           retention-days: 7
+
+  install-flow:
+    runs-on: ubuntu-latest
+    needs: [unit, typecheck]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.33.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Build docs
+        run: pnpm build:docs
+      - name: Serve docs build
+        run: npx -y serve@14.2.6 apps/docs/out -l 3000 &
+      - name: Wait for registry endpoint
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://localhost:3000/r/git-graph.json > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          echo "Registry endpoint did not come up"; exit 1
+      - name: Wipe installed component dir
+        run: rm -rf examples/consumer-app/components/git-graph
+      - name: Skip sync hooks for the install run
+        run: echo "SKIP_REGISTRY_SYNC=1" >> $GITHUB_ENV
+      - name: Run shadcn install
+        working-directory: examples/consumer-app
+        run: npx -y shadcn@latest add --yes http://localhost:3000/r/git-graph.json
+      - name: Verify install wrote expected files
+        run: |
+          test -f examples/consumer-app/components/git-graph/git-graph.tsx
+          test -f examples/consumer-app/components/git-graph/lib/layout.ts
+          grep -q "export default function GitGraph" examples/consumer-app/components/git-graph/git-graph.tsx
+      - name: Run E2E against freshly installed component
+        run: pnpm test:e2e --project=chromium
+        env:
+          SKIP_REGISTRY_SYNC: "1"
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: install-flow-report
+          path: |
+            playwright-report/
+            examples/consumer-app/components/git-graph/
+          retention-days: 7

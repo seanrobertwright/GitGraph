@@ -1,22 +1,24 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "../components/git-graph/git-graph.css";
+import ThemeToggle from "../components/theme-toggle";
 
 export const metadata: Metadata = {
   title: "GitGraph",
   description: "React component for rendering Git commit history as a visual DAG.",
 };
 
-// Sets data-theme="dark" on <html> before paint, based on the OS preference.
-// See globals.css for why this can't be done in a CSS @media block under
-// Tailwind v4. dangerouslySetInnerHTML is the standard Next pattern for
-// pre-hydration DOM mutations that need to land before first paint to avoid
-// a light-mode flash on dark systems.
+// Sets data-theme="dark" on <html> before paint. Reads localStorage("theme")
+// first (values: "light" | "dark" | "system"); falls back to OS preference.
+// Pre-hydration via dangerouslySetInnerHTML to avoid a wrong-mode flash.
+// See globals.css for why this can't live in a CSS @media block under
+// Tailwind v4. The same logic is mirrored in theme-toggle.tsx — keep in sync.
 const themeInitScript = `
   try {
-    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      document.documentElement.setAttribute('data-theme', 'dark');
-    }
+    var stored = localStorage.getItem('theme');
+    var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var dark = stored === 'dark' || ((stored === null || stored === 'system') && prefersDark);
+    if (dark) document.documentElement.setAttribute('data-theme', 'dark');
   } catch (e) {}
 `;
 
@@ -26,7 +28,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
-      <body className="min-h-screen bg-background text-foreground antialiased">{children}</body>
+      <body className="min-h-screen bg-background text-foreground antialiased">
+        <ThemeToggle />
+        {children}
+      </body>
     </html>
   );
 }

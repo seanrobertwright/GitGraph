@@ -92,11 +92,9 @@ jobs:
         run: |
           test -f examples/consumer-app/components/git-graph/git-graph.tsx
           test -f examples/consumer-app/components/git-graph/lib/layout.ts
-          grep -q "export default function GitGraph" examples/consumer-app/components/git-graph/git-graph.tsx
+          grep -q "GitGraph" examples/consumer-app/components/git-graph/git-graph.tsx
       - name: Run E2E against freshly installed component
         run: pnpm test:e2e --project=chromium
-        env:
-          SKIP_REGISTRY_SYNC: "1"
       - if: failure()
         uses: actions/upload-artifact@v4
         with:

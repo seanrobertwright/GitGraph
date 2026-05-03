@@ -3,14 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "predev": "node ../../scripts/sync-registry.mjs",
+    "predev": "node ../../scripts/sync-registry.mjs --dest=examples/consumer-app/components/git-graph",
     "dev": "next dev",
-    "prebuild": "node ../../scripts/sync-registry.mjs",
+    "prebuild": "node ../../scripts/sync-registry.mjs --dest=examples/consumer-app/components/git-graph",
     "build": "next build",
     "start": "next start",
-    "prelint": "node ../../scripts/sync-registry.mjs",
+    "prelint": "node ../../scripts/sync-registry.mjs --dest=examples/consumer-app/components/git-graph",
     "lint": "next lint",
-    "pretypecheck": "node ../../scripts/sync-registry.mjs",
+    "pretypecheck": "node ../../scripts/sync-registry.mjs --dest=examples/consumer-app/components/git-graph",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

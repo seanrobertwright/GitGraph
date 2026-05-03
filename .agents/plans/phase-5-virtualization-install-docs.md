@@ -1457,3 +1457,74 @@ This shipped in `tests/e2e/graph-animation.spec.ts` (PR #9). Lesson: when a test
 **Failure mode (CI run 25258969130, 2026-05-02):** The Phase C PR's `e2e (chromium)` job failed not on `graph-animation.spec.ts` (all 5 animation tests passed across all 3 browsers) but on `graph-screenshots.spec.ts` baselines `graph-feature-branch-chromium-linux.png` (2368 px diff, 0.02 ratio) and `graph-with-refs-chromium-linux.png` (2953 px diff, 0.02 ratio). PR was merged with the failing check.
 
 **Working substitute (deferred):** Phase C did not modify any rendering code that those baselines exercise — the `data-just-appended` attribute is absent on the screenshot pages and the new `@keyframes`/`@media` rules don't apply without that attribute. Two plausible causes: (a) chromium-on-CI nondeterminism in font/anti-alias rendering that has been latent until now, or (b) the Phase B virtualization changes shifted absolute positioning by sub-pixel amounts and the baselines were last regenerated before that change. Either way, regenerating baselines is the right next step — record as carry-forward into Phase D's "Inherited findings" so a screenshot regen is included with the next branch's pre-PR run. Per CLAUDE.md "deferred code-review findings" rule.
+
+### Phase G `sync-registry.mjs` parallel-write race under `pnpm -r --parallel`
+
+**Failure mode (executed 2026-05-03):** The plan added `pretypecheck`/`prelint` hooks to `apps/docs` that invoked `node ../../scripts/sync-registry.mjs`, mirroring the pattern already in `examples/consumer-app`. With both workspaces' hooks running concurrently under `pnpm -r --parallel typecheck` (and the same for `lint`), both invocations of the script raced on the same destination subtrees: each opened the script with the original single-DEST default and tried to `rm -rf` + `copyFile` into both `examples/consumer-app/components/git-graph/` and `apps/docs/components/git-graph/`. On Windows NTFS the overlapping `rm` and `copyFile` calls produce `EBUSY` and partial trees; on Linux CI the same race produces sporadic `ENOENT` between walk and copy.
+
+**Working substitute (shipped in PR #12):** Make the script accept multiple `--dest=<path>` argv flags and scope each workspace's pre-hook to its own destination. The default DESTS (used by the root `pnpm sync` and `pnpm install` `prepare` invocations) still target both dirs so a fresh clone with no script args remains hands-off. Per-workspace pre-hooks pass `--dest=examples/consumer-app/components/git-graph` (or the docs equivalent), removing the overlap.
+
+```js
+const argDests = process.argv
+  .slice(2)
+  .filter((a) => a.startsWith("--dest="))
+  .map((a) => resolve(repoRoot, a.slice("--dest=".length)));
+const DESTS = argDests.length > 0
+  ? argDests
+  : [
+      resolve(repoRoot, "examples/consumer-app/components/git-graph"),
+      resolve(repoRoot, "apps/docs/components/git-graph"),
+    ];
+```
+
+Lesson: when `pnpm -r --parallel` runs the same prebuild/pretest hook across multiple workspaces, any shared write target — even one the hook doesn't appear to "own" — must be partitioned by an explicit argv contract. The pre-hook that "looks workspace-local" can still race itself across workspaces.
+
+### Phase G docs dark-mode CSS — Tailwind v4 silently hoists `@media (prefers-color-scheme: dark)` token overrides into compile-time `@theme`
+
+**Failure mode (discovered 2026-05-03 while capturing the deferred README screenshot):** The docs site's `apps/docs/app/globals.css` defined the dark palette via:
+
+```css
+@media (prefers-color-scheme: dark) {
+  @theme {
+    --color-background: hsl(240 10% 3.9%);
+    /* ...etc */
+  }
+}
+```
+
+Visually the docs site rendered light-mode unconditionally, even on dark systems. Inspection of the compiled CSS showed `@media (prefers-color-scheme:dark){@theme{--color-background:#09090b;...}}` — Tailwind v4 passes the `@theme` block through to the output, but `@theme` is a Tailwind compile-time directive that browsers do not interpret. Inside a media query at runtime, it does nothing; the `:root{--color-background:#fff}` baseline always wins.
+
+Worse, attempting to fix it with plain `@media (prefers-color-scheme: dark) { :root { ... } }` (or `html { ... }`) **also fails**: Tailwind v4's compiler pattern-matches any rule inside that media query that redefines theme tokens and rewrites it as `@theme { ... }` (sometimes hoisting it out of the `@media` entirely, making the dark colors apply unconditionally; sometimes leaving it `@media`-wrapped but still inert). The `@layer base { @media { ... } }` workaround did not bypass this either — same rewrite occurred.
+
+**Working substitute (shipped in PR #13):** Drop the `@media (prefers-color-scheme: dark)` approach entirely and switch to attribute-driven dark mode:
+
+1. In `globals.css`, override tokens via an attribute selector that Tailwind doesn't touch:
+
+```css
+html[data-theme="dark"] {
+  --color-background: hsl(240 10% 3.9%);
+  /* ...etc */
+}
+```
+
+2. In `apps/docs/app/layout.tsx`, set the attribute pre-paint via an inline script that reads `prefers-color-scheme`:
+
+```tsx
+const themeInitScript = `
+  try {
+    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  } catch (e) {}
+`;
+// ...
+<head>
+  <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+</head>
+```
+
+The pre-paint inline-script pattern (vs. running in a `useEffect`) is required to avoid a light-mode flash before hydration on dark systems.
+
+The screenshot capture script `scripts/capture-screenshot.mjs` now asserts `body bg = rgb(9, 9, 11)` after navigation — so a future regression of dark-mode CSS will fail the screenshot refresh loudly instead of producing a wrong-mode capture.
+
+Lesson: Tailwind v4's `@theme` machinery owns any rule that defines theme tokens, regardless of the wrapping context. For runtime-conditional overrides (dark mode, themes, A/B variants), use a selector Tailwind v4 doesn't pattern-match against — an attribute selector is the safest choice. The canonical Tailwind v4 dark-mode pattern (`dark:` variant classes via `@variant dark`) is an alternative but requires touching every utility usage site, not just the token definitions.

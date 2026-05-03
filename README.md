@@ -2,6 +2,8 @@
 
 A shadcn-installable React component for rendering Git commit history as an interactive DAG. Virtualized to 10k commits, themable through CSS variables, deterministic layout.
 
+![GitGraph rendering a small commit DAG](docs/screenshot.png)
+
 ## 60-second quickstart
 
 Install into any Next.js or Vite project that already has shadcn initialised:

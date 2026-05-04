@@ -32,6 +32,7 @@ export type GitGraphProps = {
   onSelectChange?: (sha: string | undefined) => void;
   onCommitClick?: (commit: Commit) => void;
   onCommitHover?: (commit: Commit | null) => void;
+  filter?: (commit: Commit) => boolean;
   showWorkingTreeRow?: boolean;
   laneWidth?: number;
   rowHeight?: number;
@@ -79,6 +80,7 @@ type GitGraphState = {
   instanceId: string;
   rowId: (idx: number) => string;
   selectedRow: LayoutResult["rows"][number] | undefined;
+  selectedCommit: Commit | undefined;
   rootClassName: string;
   gutterWidth: number;
   onCommitClick: ((commit: Commit) => void) | undefined;
@@ -94,18 +96,21 @@ type LayoutOrError =
   | { ok: false; kind: GitGraphInputErrorKind };
 
 function useLayoutOrError(props: GitGraphProps): LayoutOrError {
-  const { commits, showWorkingTreeRow, head } = props;
+  const { commits, showWorkingTreeRow, head, filter } = props;
   return useMemo<LayoutOrError>(() => {
     try {
       const workingCommits = showWorkingTreeRow
         ? [synthesizeWorkingTreeCommit(head, Date.now()), ...commits]
         : commits;
-      return { ok: true, layout: computeLayout(workingCommits) };
+      return {
+        ok: true,
+        layout: computeLayout(workingCommits, filter ? { filter } : undefined),
+      };
     } catch (e) {
       if (e instanceof GitGraphInputError) return { ok: false, kind: e.kind };
       throw e;
     }
-  }, [commits, showWorkingTreeRow, head]);
+  }, [commits, showWorkingTreeRow, head, filter]);
 }
 
 function useGitGraphState(props: GitGraphProps, layout: LayoutResult): GitGraphState {
@@ -174,6 +179,19 @@ function useGitGraphState(props: GitGraphProps, layout: LayoutResult): GitGraphS
     ? layout.rows.find((r) => r.commit.sha === selectedSha)
     : undefined;
 
+  // When filter excludes the selected commit, keep the drawer's commit
+  // reference alive by looking up the unfiltered input. The WT-synthetic
+  // fallback path here recreates a fresh synthesized commit with Date.now()
+  // — accept the render-time impurity for the rare case (selected sha is
+  // WORKING_TREE_SHA, the WT row got filtered out, drawer still open).
+  const selectedCommit: Commit | undefined =
+    selectedRow?.commit ??
+    (selectedSha === undefined
+      ? undefined
+      : selectedSha === WORKING_TREE_SHA && props.showWorkingTreeRow
+        ? synthesizeWorkingTreeCommit(props.head, Date.now())
+        : props.commits.find((c) => c.sha === selectedSha));
+
   const rootClassName = rootClassNameFor(props);
   const gutterWidth = layout.laneCount * laneWidth;
 
@@ -199,6 +217,7 @@ function useGitGraphState(props: GitGraphProps, layout: LayoutResult): GitGraphS
     instanceId,
     rowId,
     selectedRow,
+    selectedCommit,
     rootClassName,
     gutterWidth,
     onCommitClick: props.onCommitClick,
@@ -228,6 +247,7 @@ function GitGraphBody({ state, virtualItems, totalSize, scrollToIndex }: GitGrap
     setSelected,
     rowId,
     selectedRow,
+    selectedCommit,
     rootClassName,
     gutterWidth,
     onCommitClick,
@@ -437,7 +457,7 @@ function GitGraphBody({ state, virtualItems, totalSize, scrollToIndex }: GitGrap
       <GitGraphDetail
         open={detailOpen}
         onOpenChange={setDetailOpen}
-        commit={selectedRow?.commit}
+        commit={selectedCommit}
         renderContent={renderDetail}
       />
     )}

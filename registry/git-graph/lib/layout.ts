@@ -7,26 +7,53 @@ import { GitGraphInputError } from "./errors";
 // commits of a long history. This applies uniformly to primary and secondary
 // parents: a merge-edge to an in-window parent is still emitted even when
 // the primary parent is out-of-window.
-export function computeLayout(commits: Commit[]): LayoutResult {
-  const bySha = new Map<string, Commit>();
+//
+// Filter mode: when `options.filter` is provided, commits for which the
+// predicate returns false are removed from the layout. Their visible
+// descendants' parent references are rewritten to the nearest-visible-ancestor
+// reached by walking through filtered ancestors. Out-of-window parents
+// continue to be silently ignored.
+export function computeLayout(
+  commits: Commit[],
+  options?: { filter?: (commit: Commit) => boolean },
+): LayoutResult {
+  const fullBySha = new Map<string, Commit>();
   for (const c of commits) {
-    if (bySha.has(c.sha)) {
+    if (fullBySha.has(c.sha)) {
       throw new GitGraphInputError(
         "duplicate-sha",
         `computeLayout: duplicate sha in input: ${c.sha}`,
         c.sha,
       );
     }
-    bySha.set(c.sha, c);
+    fullBySha.set(c.sha, c);
   }
 
-  const sorted = topoSort(commits, bySha);
-  if (sorted.length !== commits.length) {
+  // Cycle check runs against the unfiltered input — input integrity is
+  // independent of the consumer's view.
+  const sortedFull = topoSort(commits, fullBySha);
+  if (sortedFull.length !== commits.length) {
     throw new GitGraphInputError(
       "cycle",
       "computeLayout: cycle detected in commit graph",
     );
   }
+
+  // Apply filter pre-pass (if provided) before topo sort + lane assignment.
+  // The filter rewrites visible commits' parent arrays to skip over filtered
+  // ancestors, then we rebuild bySha keyed only on the visible set.
+  let workingCommits = commits;
+  let bySha = fullBySha;
+  if (options?.filter) {
+    workingCommits = applyFilter(commits, fullBySha, options.filter);
+    bySha = new Map<string, Commit>();
+    for (const c of workingCommits) bySha.set(c.sha, c);
+  }
+
+  // Re-toposort over the filtered + rewritten set. Cheap (≤ original size);
+  // necessary because lane assignment iterates in topo order and applyFilter
+  // returns commits in original input order.
+  const sorted = topoSort(workingCommits, bySha);
 
   const lanes: (string | null)[] = [];
   const rows: LayoutRow[] = [];
@@ -110,6 +137,46 @@ export function computeLayout(commits: Commit[]): LayoutResult {
   const laneCount = maxLane + 1;
 
   return { rows, edges, laneCount };
+}
+
+// Build a new commit list containing only commits for which `filter` returns
+// true, with parent arrays rewritten to point at the nearest-visible-ancestor
+// reached by walking through filtered ancestors. Order within each rewritten
+// parents[] preserves the BFS order from the original primary→secondary chain
+// so primary-parent semantics are preserved when the original primary survives.
+function applyFilter(
+  commits: Commit[],
+  bySha: Map<string, Commit>,
+  filter: (commit: Commit) => boolean,
+): Commit[] {
+  const visible = new Set<string>();
+  for (const c of commits) if (filter(c)) visible.add(c.sha);
+
+  function resolveParents(parentShas: readonly string[]): string[] {
+    const out: string[] = [];
+    const seen = new Set<string>();
+    const queue: string[] = [...parentShas];
+    while (queue.length > 0) {
+      const sha = queue.shift()!;
+      if (seen.has(sha)) continue;
+      seen.add(sha);
+      if (!bySha.has(sha)) continue; // out-of-window — drop, as today
+      if (visible.has(sha)) {
+        if (!out.includes(sha)) out.push(sha);
+        continue;
+      }
+      const grandparents = bySha.get(sha)!.parents;
+      for (const gp of grandparents) queue.push(gp);
+    }
+    return out;
+  }
+
+  const rewritten: Commit[] = [];
+  for (const c of commits) {
+    if (!visible.has(c.sha)) continue;
+    rewritten.push({ ...c, parents: resolveParents(c.parents) });
+  }
+  return rewritten;
 }
 
 function claimFreeLane(lanes: (string | null)[]): number {

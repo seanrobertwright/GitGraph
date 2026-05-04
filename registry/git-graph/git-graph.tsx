@@ -8,6 +8,7 @@ import {
   useState,
   type CSSProperties,
   type KeyboardEvent,
+  type ReactNode,
   type RefObject,
 } from "react";
 import {
@@ -16,6 +17,7 @@ import {
   type VirtualItem,
 } from "@tanstack/react-virtual";
 import GitGraphGutter from "./git-graph-gutter";
+import GitGraphDetail from "./git-graph-detail";
 import { computeLayout } from "./lib/layout";
 import { GitGraphInputError, type GitGraphInputErrorKind } from "./lib/errors";
 import { relativeTime, shortSha } from "./lib/format";
@@ -37,6 +39,10 @@ export type GitGraphProps = {
   strokeWidth?: number;
   className?: string;
   scrollContainerRef?: RefObject<HTMLElement | null>;
+  renderDetail?: (commit: Commit | undefined) => ReactNode;
+  defaultDetailOpen?: boolean;
+  detailOpen?: boolean;
+  onDetailOpenChange?: (open: boolean) => void;
 };
 
 const DEFAULTS = {
@@ -78,6 +84,9 @@ type GitGraphState = {
   onCommitClick: ((commit: Commit) => void) | undefined;
   onCommitHover: ((commit: Commit | null) => void) | undefined;
   justAppended: Set<string>;
+  detailOpen: boolean;
+  setDetailOpen: (open: boolean) => void;
+  renderDetail: ((commit: Commit | undefined) => ReactNode) | undefined;
 };
 
 type LayoutOrError =
@@ -132,6 +141,32 @@ function useGitGraphState(props: GitGraphProps, layout: LayoutResult): GitGraphS
     props.onSelectChange?.(next);
   }
 
+  const [internalDetailOpen, setInternalDetailOpen] = useState<boolean>(
+    props.defaultDetailOpen ?? false,
+  );
+  const isDetailControlledRef = useRef<boolean>(props.detailOpen !== undefined);
+  const hasWarnedDetailModeSwitchRef = useRef(false);
+  if (process.env.NODE_ENV !== "production") {
+    const currentlyDetailControlled = props.detailOpen !== undefined;
+    if (
+      currentlyDetailControlled !== isDetailControlledRef.current &&
+      !hasWarnedDetailModeSwitchRef.current
+    ) {
+      console.warn(
+        "GitGraph: switching between controlled and uncontrolled `detailOpen` is not supported. " +
+          "Component will continue using the mode it was first rendered with.",
+      );
+      hasWarnedDetailModeSwitchRef.current = true;
+    }
+  }
+  const isDetailControlled = isDetailControlledRef.current;
+  const detailOpen = isDetailControlled ? !!props.detailOpen : internalDetailOpen;
+
+  function setDetailOpen(next: boolean) {
+    if (!isDetailControlled) setInternalDetailOpen(next);
+    props.onDetailOpenChange?.(next);
+  }
+
   const instanceId = useId();
   const rowId = (idx: number) => `${instanceId}-row-${idx}`;
 
@@ -169,6 +204,9 @@ function useGitGraphState(props: GitGraphProps, layout: LayoutResult): GitGraphS
     onCommitClick: props.onCommitClick,
     onCommitHover: props.onCommitHover,
     justAppended,
+    detailOpen,
+    setDetailOpen,
+    renderDetail: props.renderDetail,
   };
 }
 
@@ -195,6 +233,9 @@ function GitGraphBody({ state, virtualItems, totalSize, scrollToIndex }: GitGrap
     onCommitClick,
     onCommitHover,
     justAppended,
+    detailOpen,
+    setDetailOpen,
+    renderDetail,
   } = state;
 
   // Keep the selected row mounted so `aria-activedescendant` always points at
@@ -247,6 +288,7 @@ function GitGraphBody({ state, virtualItems, totalSize, scrollToIndex }: GitGrap
   const last = virtualItems.at(-1);
 
   return (
+    <>
     <div
       data-testid="git-graph"
       role="listbox"
@@ -315,6 +357,7 @@ function GitGraphBody({ state, virtualItems, totalSize, scrollToIndex }: GitGrap
             onClick={() => {
               setSelected(row.commit.sha);
               onCommitClick?.(row.commit);
+              setDetailOpen(true);
             }}
             onMouseEnter={() => onCommitHover?.(row.commit)}
           >
@@ -390,6 +433,15 @@ function GitGraphBody({ state, virtualItems, totalSize, scrollToIndex }: GitGrap
         );
       })}
     </div>
+    {renderDetail && (
+      <GitGraphDetail
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        commit={selectedRow?.commit}
+        renderContent={renderDetail}
+      />
+    )}
+    </>
   );
 }
 

@@ -38,6 +38,7 @@ const RECIPE_SUBNAV: SubNavItem[] = [
   { href: "/docs/recipes/isomorphic-git", label: "isomorphic-git" },
   { href: "/docs/recipes/working-tree", label: "Working tree" },
   { href: "/docs/recipes/custom-columns", label: "Custom columns" },
+  { href: "/docs/recipes/detail-drawer", label: "Detail drawer" },
 ];
 
 export default function DocsShell({ children }: { children: ReactNode }) {

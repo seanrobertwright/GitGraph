@@ -3,10 +3,11 @@
   "name": "git-graph",
   "type": "registry:component",
   "dependencies": ["@tanstack/react-virtual"],
-  "registryDependencies": [],
+  "registryDependencies": ["sheet"],
   "files": [
     { "path": "git-graph.tsx",        "target": "components/git-graph/git-graph.tsx",        "type": "registry:component" },
     { "path": "git-graph-gutter.tsx", "target": "components/git-graph/git-graph-gutter.tsx", "type": "registry:component" },
+    { "path": "git-graph-detail.tsx", "target": "components/git-graph/git-graph-detail.tsx", "type": "registry:component" },
     { "path": "git-graph.css",        "target": "components/git-graph/git-graph.css",        "type": "registry:style"     },
     { "path": "types.ts",             "target": "components/git-graph/types.ts",             "type": "registry:lib"       },
     { "path": "lib/layout.ts",        "target": "components/git-graph/lib/layout.ts",        "type": "registry:lib"       },

@@ -7,6 +7,8 @@
   --color-muted: hsl(240 4.8% 95.9%);
   --color-muted-foreground: hsl(240 3.8% 46.1%);
   --color-border: hsl(240 5.9% 90%);
+  --color-secondary: hsl(240 4.8% 95.9%);
+  --color-ring: hsl(240 5% 64.9%);
 
   --graph-branch-1: 220 80% 55%;
   --graph-branch-2: 160 70% 45%;
@@ -31,4 +33,6 @@ html[data-theme="dark"] {
   --color-muted: hsl(240 3.7% 15.9%);
   --color-muted-foreground: hsl(240 5% 64.9%);
   --color-border: hsl(240 3.7% 15.9%);
+  --color-secondary: hsl(240 3.7% 15.9%);
+  --color-ring: hsl(240 5% 64.9%);
 }

@@ -7,6 +7,7 @@ const RECIPES = [
   { href: "/docs/recipes/isomorphic-git", title: "isomorphic-git", blurb: "Read commits in-browser from a cloned repo." },
   { href: "/docs/recipes/working-tree", title: "Working tree row", blurb: "Show uncommitted work as a synthetic top row." },
   { href: "/docs/recipes/custom-columns", title: "Custom columns", blurb: "Pair the gutter with your own table layout." },
+  { href: "/docs/recipes/detail-drawer", title: "Commit detail drawer", blurb: "Render a right-side drawer with a render-prop; minimal and decoupled-controlled examples." },
 ];
 
 export default function RecipesPage() {

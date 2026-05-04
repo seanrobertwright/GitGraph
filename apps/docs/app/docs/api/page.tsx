@@ -9,6 +9,7 @@ const GITGRAPH_PROPS = [
   { name: "onSelectChange", type: "(sha: string | undefined) => void", description: "Fires when the selection changes (controlled or uncontrolled)." },
   { name: "onCommitClick", type: "(commit: Commit) => void", description: "Fires on row click. Independent of selection." },
   { name: "onCommitHover", type: "(commit: Commit | null) => void", description: "Fires on row mouseenter (with the commit) and mouseleave (with null)." },
+  { name: "filter", type: "(commit: Commit) => boolean", description: "Predicate that hides commits for which it returns false. The layout engine rewrites edges to skip filtered commits — if A's parent B is filtered out, A's edge points to B's nearest visible ancestor. Selection state survives a commit being filtered out: the row disappears but the detail drawer (if rendered) keeps the remembered commit." },
   { name: "renderDetail", type: "(commit: Commit | undefined) => ReactNode", description: "When provided, renders an off-canvas right-side drawer alongside the graph. The function receives the currently selected commit (or undefined if no selection) and returns the drawer's interior." },
   { name: "defaultDetailOpen", type: "boolean", default: "false", description: "Initial open state of the detail drawer in uncontrolled mode." },
   { name: "detailOpen", type: "boolean", description: "Controlled open state of the detail drawer. When provided, GitGraph treats the drawer as controlled and won't update internal open state." },

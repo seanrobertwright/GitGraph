@@ -1,7 +1,12 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import type { Commit } from "./types";
 
 export type GitGraphDetailProps = {
@@ -22,6 +27,9 @@ export default function GitGraphDetail(props: GitGraphDetailProps) {
         data-testid="git-graph-detail"
       >
         <SheetTitle className="sr-only">Commit detail</SheetTitle>
+        <SheetDescription className="sr-only">
+          Details for the selected commit.
+        </SheetDescription>
         {renderContent(commit)}
       </SheetContent>
     </Sheet>

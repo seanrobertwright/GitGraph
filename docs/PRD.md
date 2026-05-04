@@ -1,7 +1,7 @@
 # GitGraph — Product Requirements Document
 
-**Status:** Draft v0.1
-**Last updated:** 2026-04-24
+**Status:** Draft v0.2 (Phase 6 added)
+**Last updated:** 2026-05-03
 **Owner:** seanrobertwright@gmail.com
 
 ---
@@ -78,16 +78,22 @@ Make the best-drawn, best-themed Git history visualization in the React ecosyste
 - ✅ Static docs site with live demos
 - ✅ Copy-pasteable install command on landing page
 
-### Out of Scope (deferred)
+### Out of Scope (MVP — deferred to Phase 6+)
 
-- ❌ Horizontal orientation
-- ❌ Canvas/WebGL renderer for 100k+ commit graphs
+- ➡️ Horizontal orientation (Phase 6G)
+- ➡️ Branch / author / text filtering with built-in UI (Phase 6B + 6C)
+- ➡️ Commit detail drawer + inline row expansion (Phase 6A + 6D)
+- ➡️ Keyboard navigation polish (Phase 6E)
+- ➡️ Adapter components for GitHub GraphQL, isomorphic-git, GitLab — shipped as additional shadcn-installable registry entries, not npm packages (Phase 6F + later)
+
+### Permanently Out of Scope
+
+- ❌ Canvas/WebGL renderer for 100k+ commit graphs (deferred until real-world demand)
 - ❌ Git client functionality (no checkout, merge, fetch — viz only)
-- ❌ Direct integration with `isomorphic-git`, `simple-git`, or GitHub API (consumer's responsibility; we ship raw-DAG shape + tiny `fromGitLog()` helper only)
-- ❌ Commit diff rendering
-- ❌ Graph filtering / branch hiding UI (consumer composes this themselves)
+- ❌ Built-in commit diff rendering — recommended pattern is to render a consumer-supplied diff component inside the Phase 6A detail slot
+- ❌ Built-in blame integration — exposed via existing selection state; consumer wires their file viewer's blame line to set `selectedSha`
 - ❌ Drag-to-rebase or any write operations
-- ❌ npm-published package (shadcn-CLI install only)
+- ❌ npm-published package (shadcn-CLI install only — applies to core component AND adapter components)
 - ❌ Storybook (demos live in the Next.js docs app)
 - ❌ Internationalization of UI strings (we ship very few strings)
 
@@ -470,17 +476,95 @@ type Ref = {
 
 ---
 
-## 13. Future Considerations
+### Phase 6 — Robustness for production app integration
+
+**Goal:** Make the headline component robust enough to drop into a production app without consumer-side scaffolding, while keeping the primitive developer-friendly. Prioritized headline-first, primitive-second. All sub-phases are additive — no breaking changes to the Phase 1–5 API.
+
+#### Phase 6A — Commit detail drawer + slot pattern
+**Deliverables:**
+- Off-canvas drawer rendered alongside the graph, controlled by `selectedSha`
+- Slot or render-prop API for consumer-supplied detail content (e.g. `<GitGraph.Detail>` compound child OR `renderDetail?: (commit) => ReactNode` — decide at plan-feature time)
+- Drawer open/close state controllable by consumer; default uncontrolled
+- Establishes the slot pattern reused by 6D and by the recommended diff-visualization recipe
+**Validation:**
+- E2E: click row → drawer opens with consumer-supplied content; ESC closes
+- No layout shift to graph itself when drawer opens
+
+#### Phase 6B — Filter props (headless, controlled)
+**Deliverables:**
+- `filter?: (commit: Commit) => boolean` predicate prop on `<GitGraph>` and `<GitGraphGutter>`
+- Layout engine respects filter — filtered commits are removed from lane assignment, edges skip over them where parents are still visible
+- Additive; no UI shipped in this phase
+**Validation:**
+- Unit: layout engine produces valid lane assignment with arbitrary filter predicates against all existing fixtures
+- E2E: consumer-supplied filter renders only matching commits with edges intact
+
+#### Phase 6C — Built-in filter bar UI
+**Deliverables:**
+- Filter bar rendered above the graph (full-width)
+- Controls: branch chips (multi-select, derived from `refs[]`), author multi-select (derived from `commits[].author.name`), text search (matches sha prefix + message + author), time range (date pickers + relative presets)
+- `showFilterBar?: boolean` prop, default `false` (opt-in, preserves existing consumer layouts)
+- Collapse/expand button inside the bar for runtime UI visibility toggle
+- Internally translates UI state → headless `filter` predicate from 6B
+**Validation:**
+- E2E: each control narrows the rendered graph correctly; collapse hides controls
+- Filter bar respects shadcn theme tokens; dark mode parity
+
+#### Phase 6D — Inline row expansion
+**Deliverables:**
+- Variable-height virtualization via `@tanstack/react-virtual`'s `measureElement`
+- Gutter geometry handles expanded rows without distorting bezier curves crossing the expanded region (lane lines extend through the tall row; node positions for non-expanded rows unaffected)
+- Consumer-controlled expansion state (`expandedShas?: Set<string>`) + render-prop for expanded content
+- Coexists with the 6A drawer — consumer picks one mode per instance, or both
+**Validation:**
+- E2E: expand a row mid-list, scroll, collapse — virtualized window stays correct, scroll anchor preserved
+- Screenshot test: bezier curves crossing an expanded row remain visually correct
+- Performance: expanded rows do not regress the 10k-commit frame budget
+
+#### Phase 6E — Keyboard navigation polish
+**Deliverables:**
+- Audit existing `tests/e2e/graph-keyboard.spec.ts`; finish whatever is partial
+- Arrow keys + vim-style `j`/`k` move row selection
+- `Enter` fires `onCommitClick` for the focused row
+- `/` focuses the filter bar's text-search input when 6C bar is visible
+- Roving tabindex pattern; visible focus ring respects shadcn focus tokens
+**Validation:**
+- E2E: full keyboard-only navigation through a 100-commit fixture
+- A11y: focus order is sensible; no keyboard traps
+
+#### Phase 6F — GitHub GraphQL adapter (registry component)
+**Deliverables:**
+- New shadcn-installable registry entry `git-graph-github` (separate from `git-graph` core)
+- Installs `from-github-graphql.ts` into the consumer's project — a pure function mapping a GitHub GraphQL `repository.ref.target.history` response shape to `Commit[]`
+- Same distribution model as the core component: copy-into-project, no runtime npm dependency
+- Establishes the adapter pattern reused for isomorphic-git and GitLab later
+- Docs page with end-to-end recipe: GraphQL query → adapter → `<GitGraph>`
+**Validation:**
+- Unit: adapter produces correct `Commit[]` from real recorded GraphQL responses (test fixtures committed)
+- E2E: install adapter via shadcn CLI in example app, render fixture commits
+
+#### Phase 6G — Horizontal orientation
+**Deliverables:**
+- `orientation?: 'vertical' | 'horizontal'` prop on `<GitGraph>` and `<GitGraphGutter>`, default `'vertical'`
+- Layout engine swaps lane axis (lane → x-coordinate) and time axis (commit order → x-progression) when horizontal
+- Bezier curve generation handles both orientations
+- Existing screenshot tests stay green (vertical default unchanged)
+**Validation:**
+- Unit: layout engine produces correct geometry for both orientations across all fixtures
+- Screenshot test: horizontal renderings of representative fixtures (linear, merge, octopus)
+- E2E: orientation switch at runtime does not break virtualization
+
+---
+
+## 13. Future Considerations (gated on real-world demand)
 
 - **Canvas renderer** for 100k+ commit graphs (shared layout engine, swap-in `<GitGraphGutterCanvas>`)
-- **Horizontal orientation** for space-constrained UIs
-- **Real data adapters** — opt-in packages for `isomorphic-git`, GitHub GraphQL, GitLab API
-- **Interactive features** — branch filtering UI, author filtering, time-range zoom
-- **Commit detail slot** — standardized `<GitGraph.Detail>` drawer component
-- **Diff visualization** — show files changed per commit inline
-- **Keyboard navigation** — arrow keys, vim-style j/k, `/` to search
-- **Mini-map** — overview scroll indicator for long histories
-- **Blame integration** — hover a line in a file viewer, highlight introducing commit in the graph
+- **Mini-map** — overview scroll indicator for long histories; build only after virtualization users request it
+- **isomorphic-git adapter** — registry component following the Phase 6F pattern
+- **GitLab adapter** — registry component following the Phase 6F pattern
+- **Drag-to-reorder lanes** for users who want to tweak the deterministic lane assignment
+
+Items intentionally not on the roadmap (see §4 *Permanently Out of Scope*): built-in diff rendering, built-in blame integration, npm-published packaging, Storybook, write operations.
 
 ---
 
